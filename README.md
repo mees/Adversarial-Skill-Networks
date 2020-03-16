@@ -10,11 +10,31 @@ This code implements Adversarial Skill Networks, an approach for unsupervised sk
 If you find the code helpful please consider citing our work 
 ```
 @INPROCEEDINGS{mees20icra_asn,
-author = {Oier Mees and Markus Merklinger and Gabriel Kalweit and Wolfram Burgard},
-title = {Adversarial Skill Networks: Unsupervised Robot Skill Learning from Videos},
-booktitle = {Proceedings of the IEEE International Conference on Robotics and Automation  (ICRA)},
-year = 2020,
-address = {Paris, France}
+  author = {Oier Mees and Markus Merklinger and Gabriel Kalweit and Wolfram Burgard},
+  title = {Adversarial Skill Networks: Unsupervised Robot Skill Learning from Videos},
+  booktitle = {Proceedings of the IEEE International Conference on Robotics and Automation  (ICRA)},
+  year = 2020,
+  address = {Paris, France}
 }
-}
+
 ```
+
+## Installation
+
+
+## Training
+
+
+## Evaluation
+
+
+
+## Dataset
+Our  Block Task dataset contains multi-view rgb data of several block manipulation tasks and can be found [here](http://robotskills.cs.uni-freiburg.de/#dataset).
+
+<p align="center">
+  <img src="http://robotskills.cs.uni-freiburg.de/images/sort4_view2.gif" width="75%"/>
+</p>
+
+## License
+For academic usage, the code related to the gating layers, our caffe models and utility scripts are released under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html) license. For any commercial purpose, please contact the authors. For Pytorch see its respective license.
