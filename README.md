@@ -33,7 +33,7 @@ If you find the code helpful please consider citing our work
 Our  Block Task dataset contains multi-view rgb data of several block manipulation tasks and can be found [here](http://robotskills.cs.uni-freiburg.de/#dataset).
 
 <p>
-  <img src="http://robotskills.cs.uni-freiburg.de/images/2block_stack7_view2.gif" width="22%" /> <img src="http://robotskills.cs.uni-freiburg.de/images/sort4_view2.gif" width="22%"/> <img src="http://robotskills.cs.uni-freiburg.de/images/cstack76_view2.gif" width="22%"/>  <img src="http://robotskills.cs.uni-freiburg.de/images/sep64_view2.gif" width="22%"/>
+  <img src="http://robotskills.cs.uni-freiburg.de/images/2block_stack7_view2.gif" width="23%" /> <img src="http://robotskills.cs.uni-freiburg.de/images/sort4_view2.gif" width="23%"/> <img src="http://robotskills.cs.uni-freiburg.de/images/cstack76_view2.gif" width="23%"/>  <img src="http://robotskills.cs.uni-freiburg.de/images/sep64_view2.gif" width="23%"/>
 </p>
 
 ## License
