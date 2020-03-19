@@ -36,7 +36,6 @@ from torch.backends import cudnn
 from asn.utils.sampler import RNNViewPairSequenceSampler
 # For fast training
 cudnn.benchmark = True
-IMAGE_SIZE = (299, 299)#inception_v3
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -177,23 +176,6 @@ def entropy(y):
     y2 = 1.0/y.size(0)*y1.sum()
     return y2
 
-def get_train_transformer(img_size=IMAGE_SIZE[0]):
-    transformer_train = transforms.Compose([
-        transforms.ToPILImage(),
-         # transforms.Resize(img_size),  #  original tcn with center crop (pouring), user for pybullet data
-	transforms.CenterCrop(img_size),  # TODO original tcn with center crop(pouring)
-        # transforms.RandomResizedCrop(IMAGE_SIZE[0], scale=(0.9, 1.0)), # for real data
-        transforms.RandomHorizontalFlip(),
-        transforms.ColorJitter(brightness=0.3,
-                               contrast=0.3,
-#                               hue=0.03,# use for real block data
-                               saturation=0.3),
-        transforms.ToTensor(),
-        # normalize https://pytorch.org/docs/master/torchvision/models.html
-#       transforms.Normalize([0.485, 0.456, 0.406],
-#                             [0.229, 0.224, 0.225])
-    ])
-    return transformer_train
 
 def get_domain_dataloader_train(dir_vids, num_views, batch_size, criterion,use_cuda,filter_func,lable_funcs,num_domain_frames=1,stride=1):
     # sampler with all rand frames from alle task
