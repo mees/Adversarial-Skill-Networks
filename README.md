@@ -72,7 +72,7 @@ ls -ltrh /dev/video*
 
 Now start the recording for n webcams:
 ```
-py utils/webcam_dataset_creater.py --ports 0,1 --tag test --display
+python utils/webcam_dataset_creater.py --ports 0,1 --tag test --display
 ```
 Hit Ctrl-C when done collecting, upon which the script will compile videos for each view
 .
