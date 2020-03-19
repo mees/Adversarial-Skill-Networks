@@ -45,8 +45,8 @@ After cd-ing to the repo install it with:<br>
 
 
 ## Training
-First download and extract the [dataset](http://robotskills.cs.uni-freiburg.de/dataset/real_block_tasks.zip) containing the block tasks into your /tmp/ directory. To start the training you need to specify the location of the dataset and which tasks you want to held out.
-```CUDA_VISIBLE_DEVICES=0 python train_asn.py --train-dir /tmp/real_combi_task3/videos/train/ --val-dir-metric /tmp/real_combi_task3/videos/val/ --save-folder ~/tmp/abd_to_c  --train-filter-tasks cstack ```<br>
+First download and extract the [dataset](http://robotskills.cs.uni-freiburg.de/dataset/real_block_tasks.zip) containing the block tasks into your /tmp/ directory. To start the training you need to specify the location of the dataset and which tasks you want to held out. For example, to train the embedding on the tasks 2 block stacking, color pushing and  separate to stack and evaluate it via video alignment on the unseen color stacking task:<br>
+```CUDA_VISIBLE_DEVICES=0 python train_asn.py --train-dir /tmp/real_combi_task3/videos/train/ --val-dir-metric /tmp/real_combi_task3/videos/val/ --save-folder /tmp/abd_to_c  --train-filter-tasks cstack ```<br>
 
 
 ## Evaluation
