@@ -44,7 +44,7 @@ def get_args():
     parser.add_argument('--steps', type=int, default=1500000)
     parser.add_argument('--save-every', type=int, default=20)
     parser.add_argument('--save-folder', type=str,
-                        default='~/trained/asn/')
+                        default='/tmp/abd_to_c')
     parser.add_argument('--load-model', type=str, required=False)
     parser.add_argument('--task', type=str, default="cstack",help='dataset, load tasks for real block data (cstack)')
     parser.add_argument('--train-dir', type=str, default='~/data/train/')
