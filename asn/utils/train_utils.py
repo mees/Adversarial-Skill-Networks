@@ -169,7 +169,7 @@ def init_log_tb(save_folder):
     set_log_file(os.path.join(save_folder, "train.log"))
 
     log.info("torchtcn commit hash: {}".format(
-        get_git_commit_hash(torchtcn.__file__)))
+        get_git_commit_hash(asn.__file__)))
     tb_log_dir = os.path.join(
         os.path.expanduser(save_folder), "tensorboard_log")
     writer = SummaryWriter(tb_log_dir)

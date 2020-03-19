@@ -308,3 +308,100 @@ class DoubleViewPairDataset(Dataset):
             for frame_index in frame_range:
                 self.item_idx_lookup.append(
                     [view_pair_index, frame_index])
+
+class ViewPairDataset(Dataset):
+    """multi view pair video dataset.
+        dataset with mulitple views pairs video synced in time
+        frames are provided was separately
+    """
+
+    def __init__(self, vid_dir, number_views, n_frame=1,use_img_if_exists=True,
+                 transform_frames=transforms.ToTensor(), filter_func=None):
+        """
+        Args:
+            vid_dir (string): Directory with all the muliti view videos.
+            number_views (int): number of views
+            n_frame(int): number of sample to skip in sequence
+            transform (callable, optional): Optional transform to be applied
+                on a sample. if None no transformation
+            filter_func: function to filter videos, input common view pair namen, and view pairs frame len list
+        """
+        self.transform_frames = transform_frames
+        self.n_views = number_views
+        self.vid_dir = vid_dir
+        self.n_frame = n_frame
+        self._sample_counter = 0
+        self.video_paths = get_view_pair_vid_files(
+            self.n_views, self.vid_dir, join_path=True)
+        self._count_frames()
+        self._use_labels = are_csv_files_in_dir(self.vid_dir)
+        if filter_func is not None:
+            # filter video based on input function
+            self.video_paths, self.frame_lengths = _filter_view_paris(
+                self.video_paths, self.frame_lengths, filter_func)
+        self._create_look_up()
+        self._print_dataset_info_txt()
+        self.use_img_if_exists=use_img_if_exists
+        self.print_frame_len_info()
+
+
+    def __len__(self):
+        return len(self.item_idx_lookup)
+
+    def __getitem__(self, idx):
+        self._sample_counter += 1
+        view_pair_index, view_index, frame_index = self.item_idx_lookup[idx]
+        vid_file = self.video_paths[view_pair_index][view_index]
+
+        _, tail = os.path.split(vid_file)
+        vid_file_comm, frame = get_frame(vid_file,frame_index,self.use_img_if_exists)
+        if self.transform_frames:
+            frame = self.transform_frames(frame)
+        vid_len=self.frame_lengths[view_pair_index][view_index]
+        is_last_frame = vid_len- self.n_frame <= frame_index
+        # print("idx",idx, "vid len",len(vid),"view",view_num_i,)
+        # print("self._sample_counter",self._sample_counter)
+        # print("self.totlal_frame_lengths",self.totlal_frame_lengths)
+        samples = {"frame": frame,
+                   "frame index": frame_index,
+                   "video len": vid_len,
+                   "common name": vid_file_comm,
+                   "view": view_index,
+                   "is last frame": is_last_frame}
+        if self._use_labels:
+            csv_file=get_video_csv_file(self.vid_dir, vid_file_comm)
+            lable_state = get_state_labled_frame(csv_file, frame_index)
+            samples['state lable'] = lable_state
+
+        return samples
+
+    def _print_dataset_info_txt(self):
+        info_txt_file = os.path.join(self.vid_dir,"../../dataset_info.txt")
+        if os.path.exists(info_txt_file):
+            with open(info_txt_file, 'r') as f:
+                log.info("dataset info:\n {}".format(f.read()))
+
+    def _count_frames(self):
+        self.frame_lengths = [[len(VideoFrameSampler(v_i))
+                               for v_i in views]for views in self.video_paths]
+
+    def print_frame_len_info(self):
+
+        max_len_vid = max(max(l) for l in self.frame_lengths)
+        min_len_vid = min(min(l) for l in self.frame_lengths)
+        mean_len_vid = int(np.mean(self.frame_lengths))
+        log.info("{} videos frame len mean : {}, min: {}, max: {}".format(
+            self.vid_dir, mean_len_vid, min_len_vid, max_len_vid))
+
+    def _create_look_up(self):
+        self.totlal_frame_lengths = (np.sum(self.frame_lengths))
+        self.item_idx_lookup = []
+        for view_pair_index, view_lens in enumerate(self.frame_lengths):
+            for view_index, l in enumerate(view_lens):
+                frame_range = [i for i in range(0, l, self.n_frame)]
+                for frame_index in frame_range:
+                    self.item_idx_lookup.append(
+                        [view_pair_index, view_index, frame_index])
+
+    def get_all_comm_view_pair_names(self):
+        return _get_all_comm_view_pair_names(self.video_paths)
