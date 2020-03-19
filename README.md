@@ -46,7 +46,9 @@ After cd-ing to the repo install it with:<br>
 ## Training
 First download and extract the [dataset](http://robotskills.cs.uni-freiburg.de/dataset/real_block_tasks.zip) containing the block tasks into your /tmp/ directory. To start the training you need to specify the location of the dataset and which tasks you want to held out. For example, to train the skill embedding on the tasks 2 block stacking, color pushing and  separate to stack and evaluate it via video alignment on the unseen color stacking task:<br>
 
-```python train_asn.py --train-dir /tmp/real_combi_task3/videos/train/ --val-dir-metric /tmp/real_combi_task3/videos/val/  --train-filter-tasks cstack ```
+```
+python train_asn.py --train-dir /tmp/real_combi_task3/videos/train/ --val-dir-metric /tmp/real_combi_task3/videos/val/  --train-filter-tasks cstack
+```
 
 
 
@@ -63,9 +65,16 @@ Our  Block Task dataset contains multi-view rgb data of several block manipulati
 
 ## Recording your own multi-view dataset
 We provide a python script to record and synchronize several webcams. First check if your webcams are recognized:<br>
+
 ```
 ls -ltrh /dev/video*
-```
+``` 
 
+Now start the recording for n webcams:
+```
+py utils/webcam_dataset_creater.py --ports 0,1 --tag test --display
+```
+Hit Ctrl-C when done collecting, upon which the script will compile videos for each view
+.
 ## License
 For academic usage, the code is released under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html) license. For any commercial purpose, please contact the authors. For Pytorch see its respective license.
