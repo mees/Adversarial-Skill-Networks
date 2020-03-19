@@ -57,14 +57,14 @@ def get_args():
     parser.add_argument('--num-views', type=int, default=2)
     parser.add_argument('--no-tsne', action='store_true')
     parser.add_argument('--num-domain-frames', type=int, default=2)
-    parser.add_argument('--multi-domain-frames-stride', type=int, default=30)
+    parser.add_argument('--multi-domain-frames-stride', type=int, default=15)
     parser.add_argument('--label-mode', default='task', type=str,help="use task id or task sector lable output for D.")
     parser.add_argument('--mode', type=str, default="cat-gan",help='cat-gan')
     parser.add_argument('--mode-dist', type=str, default="kl",help='DistDiscriminator mode, fc or kl, fc-sector, kl-sector')
     parser.add_argument('--mode-input', type=str, default="emb",help='input for the discriminator dist, emb, emb-combi, emb-combi-bot or freatures')
     parser.add_argument('--train-filter-tasks',
             help="task names to filter for trainig data, fromat, taskx,taskb. videos with the file name will be filtered", type=str, default=None)
-    parser.add_argument('--num-example-batch',help="num exmaple per batch each vid, only lifted loss support", type=int, default=1)
+    parser.add_argument('--num-example-batch',help="num example per batch each vid, only lifted loss support", type=int, default=4)
     return parser.parse_args()
 
 class Discriminator(nn.Module):

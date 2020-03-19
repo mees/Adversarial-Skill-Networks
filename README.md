@@ -20,6 +20,7 @@ If you find the code helpful please consider citing our work
 ```
 
 ## Installation
+We provide a simple package to install ASN preferably in a virtual environment. We have tested the code with Ubuntu 18.04.
 If not installed, install virtualenv and virtualenvwrapper with --user option: <br>
 ```pip install --user virtualenv virtualenvwrapper```
 
@@ -35,15 +36,16 @@ source $HOME/.local/bin/virtualenvwrapper.sh
 Create a virtual environment with Python3: <br>
 ```mkvirtualenv -p /usr/bin/python3 asn```<br>
 
-Now clone our repo:
+Now clone our repo:<br>
 ```git clone git@github.com:mees/Adversarial-Skill-Networks.git```<br>
 
-After cd-ing to the repo install it:
+After cd-ing to the repo install it with:<br>
 ```pip install -e .```<br>
 
 
 
 ## Training
+```CUDA_VISIBLE_DEVICES=1 python train_gan_entro.py --train-dir /tmp/real_combi_task3/videos/train/ --val-dir-metric /tmp/real_combi_task3/videos/val/ --save-folder ~/skills/experiments_real/num_frames/stride15_num2_abd_to_c  --train-filter-tasks cstack ```<br>
 
 
 ## Evaluation
