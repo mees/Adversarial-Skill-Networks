@@ -37,6 +37,7 @@ from asn.utils.sampler import RNNViewPairSequenceSampler
 # For fast training
 cudnn.benchmark = True
 
+#task names: "cstack","cpush","2block_stack","sort","sep"
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--start-epoch', type=int, default=1)
@@ -45,7 +46,7 @@ def get_args():
     parser.add_argument('--save-folder', type=str,
                         default='~/trained/asn/')
     parser.add_argument('--load-model', type=str, required=False)
-    parser.add_argument('--task', type=str, default="cstack",help='dataset, load tasks for real block data (cstack) or ulm dataset:  cstack or uulm')
+    parser.add_argument('--task', type=str, default="cstack",help='dataset, load tasks for real block data (cstack)')
     parser.add_argument('--train-dir', type=str, default='~/data/train/')
     parser.add_argument('--val-dir-metric',
                         type=str, default='~/tcn_data/val')
@@ -63,7 +64,7 @@ def get_args():
     parser.add_argument('--mode-dist', type=str, default="kl",help='DistDiscriminator mode, fc or kl, fc-sector, kl-sector')
     parser.add_argument('--mode-input', type=str, default="emb",help='input for the discriminator dist, emb, emb-combi, emb-combi-bot or freatures')
     parser.add_argument('--train-filter-tasks',
-            help="task names to filter for trainig data, fromat, taskx,taskb. videos with the file name will be filtered", type=str, default=None)
+            help="task names to filter for training data, format, taskx,taskb. videos with the file name will be filtered", type=str, default=None)
     parser.add_argument('--num-example-batch',help="num example per batch each vid, only lifted loss support", type=int, default=4)
     return parser.parse_args()
 

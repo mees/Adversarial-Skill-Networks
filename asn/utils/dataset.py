@@ -106,7 +106,7 @@ def _get_all_comm_view_pair_names(video_paths):
     return all_file_comm
 
 
-def _filter_view_paris(video_paths_pair, frames_length_pair, filter_func):
+def _filter_view_pairs(video_paths_pair, frames_length_pair, filter_func):
     filtered_paths = []
     filtered_vid_len = []
     all_comm_names = _get_all_comm_view_pair_names(video_paths_pair)
@@ -195,7 +195,7 @@ class DoubleViewPairDataset(Dataset):
         self._count_frames()
         if filter_func is not None:
             # filter video based on input function
-            self.video_paths, self.frame_lengths = _filter_view_paris(
+            self.video_paths, self.frame_lengths = _filter_view_pairs(
                 self.video_paths, self.frame_lengths, filter_func)
         self._create_look_up()
         self.use_img_if_exists=use_img_if_exists
@@ -207,10 +207,6 @@ class DoubleViewPairDataset(Dataset):
     def __getitem__(self, idx):
         self._sample_counter += 1
         view_pair_index, frame_index_anchor = self.item_idx_lookup[idx]
-        # DEBUG check lookups
-        # test_idx= self.idx_lookup[view_pair_index][frame_index]
-        # assert test_idx == idx
-        is_last_frame_view = []
         samples = {}
 
         #flip rand view index
@@ -337,7 +333,7 @@ class ViewPairDataset(Dataset):
         self._use_labels = are_csv_files_in_dir(self.vid_dir)
         if filter_func is not None:
             # filter video based on input function
-            self.video_paths, self.frame_lengths = _filter_view_paris(
+            self.video_paths, self.frame_lengths = _filter_view_pairs(
                 self.video_paths, self.frame_lengths, filter_func)
         self._create_look_up()
         self._print_dataset_info_txt()
