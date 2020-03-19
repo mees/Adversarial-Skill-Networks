@@ -168,7 +168,7 @@ def init_log_tb(save_folder):
     log.setLevel(logging.INFO)
     set_log_file(os.path.join(save_folder, "train.log"))
 
-    log.info("torchtcn commit hash: {}".format(
+    log.info("asn commit hash: {}".format(
         get_git_commit_hash(asn.__file__)))
     tb_log_dir = os.path.join(
         os.path.expanduser(save_folder), "tensorboard_log")

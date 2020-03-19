@@ -233,9 +233,9 @@ if __name__ == '__main__':
         torch.cuda.seed()
         criterion.cuda()
 
-    tcn, start_epoch, start_step, _, _ = create_model(
+    asn, start_epoch, start_step, _, _ = create_model(
         use_cuda, args.load_model)
-    log.info('tcn: {}'.format(tcn.__class__.__name__))
+    log.info('asn: {}'.format(asn.__class__.__name__))
 
     # var for train info
     loss_val_min = None
@@ -316,8 +316,8 @@ if __name__ == '__main__':
                                                               stride=stride)
 
     global_step = start_step
-    tcn.train()
-    tcn.cuda()
+    asn.train()
+    asn.cuda()
 
     criterion_entro = HLoss()
     criterion_domain = nn.CrossEntropyLoss()
@@ -331,7 +331,7 @@ if __name__ == '__main__':
     def model_forward(frame_batch, to_numpy=True):
         if use_cuda:
             frame_batch = frame_batch.cuda()
-        feat, emb, kl_loss = tcn.forward(frame_batch)
+        feat, emb, kl_loss = asn.forward(frame_batch)
         if to_numpy:
             return emb.data.cpu().numpy()
         else:
@@ -340,7 +340,7 @@ if __name__ == '__main__':
     def model_forward_feature_ex(frame_batch,to_numpy=False):
         if use_cuda:
             frame_batch = frame_batch.cuda()
-        feature_ex, emb, kl_loss = tcn.forward(frame_batch, only_feat=True)
+        feature_ex, emb, kl_loss = asn.forward(frame_batch, only_feat=True)
         return feature_ex, kl_loss
 
     if args.mode_input in ['emb', 'emb-combi', 'emb-combi-dot','dist']:
@@ -369,7 +369,7 @@ if __name__ == '__main__':
         _ = d_net(emb_tcn)
         return d_net.z
 
-    params_tcn = filter(lambda p: p.requires_grad, tcn.parameters())
+    params_tcn = filter(lambda p: p.requires_grad, asn.parameters())
 
     optimizer_g = optim.Adam(params_tcn, lr=args.lr_start)
     optimizer_d = optim.Adam(d_net.parameters(), lr=args.lr_start)
@@ -529,7 +529,7 @@ if __name__ == '__main__':
         if global_step % 5000== 0:
             # valGidation
             log.info("==============================")
-            tcn.eval()
+            asn.eval()
             d_net.eval()
 
             if args.val_dir_domain is not None:
@@ -556,7 +556,7 @@ if __name__ == '__main__':
             loss_val, nn_dist, dist_view_pais, frame_distribution_err_cnt = view_pair_alignment_loss(model_forward,
                                                                                               args.num_views,
                                                                                               dataloader_val)
-            tcn.train()
+            asn.train()
             d_net.train()
 
             writer.add_histogram("validation/frame_error_count",
@@ -578,7 +578,7 @@ if __name__ == '__main__':
                 epoch, loss_val, nn_dist, loss_val_min, loss_val_min_step)
             log.info(msg)
             print('msg: {}'.format(msg))
-            save_model(tcn, optimizer_g, args, is_best,
+            save_model(asn, optimizer_g, args, is_best,
                        args.save_folder, epoch, global_step)
 
     writer.close()
