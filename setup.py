@@ -20,8 +20,7 @@ _version = re.search(r'^__version__\s*=\s*"(.*)"', _meta, re.M).group(1)
 _author = re.search(r'^__author__\s*=\s*"(.*)"', _meta, re.M).group(1)
 _mail = re.search(r'^__email__\s*=\s*"(.*)"', _meta, re.M).group(1)
 
-install_requires = [
-    l.replace('==', '>=') for l in _read('requirements.txt').split('\n')
+install_requires = [l for l in _read('requirements.txt').split('\n')
     if l and not l.startswith('#') and not l.startswith('-')]
 
 meta = dict(

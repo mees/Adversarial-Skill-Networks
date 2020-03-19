@@ -20,6 +20,27 @@ If you find the code helpful please consider citing our work
 ```
 
 ## Installation
+If not installed, install virtualenv and virtualenvwrapper with --user option: <br>
+```pip install --user virtualenv virtualenvwrapper```
+
+Add the following virtualenvwrapper settings to your .bashrc:
+<pre>
+export WORKON_HOME=$HOME/.virtualenvs
+export PROJECT_HOME=$HOME/.venvproject
+export VIRTUALENVWRAPPER_VIRTUALENV_ARGS='--no-site-packages'
+source $HOME/.local/bin/virtualenvwrapper.sh
+</pre>
+
+
+Create a virtual environment with Python3: <br>
+```mkvirtualenv -p /usr/bin/python3 asn```<br>
+
+Now clone our repo:
+```git clone git@github.com:mees/Adversarial-Skill-Networks.git```<br>
+
+After cd-ing to the repo install it:
+```pip install -e .```<br>
+
 
 
 ## Training

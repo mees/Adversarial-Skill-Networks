@@ -3,7 +3,7 @@ numpy
 scipy
 torch==1.1.0
 pillow
-torchvision
+torchvision==0.3.0
 sklearn
 opencv-python
 matplotlib
