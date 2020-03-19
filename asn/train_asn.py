@@ -376,7 +376,6 @@ if __name__ == '__main__':
 
     assert isinstance(criterion, (LiftedStruct, LiftedCombined))
     epoch_start = time.time()
-    # pouring task
     frame_distribution = {}  # no dist
     key_views = ["frames views {}".format(i) for i in range(args.num_views)]
     cnt_data_fps = 0

@@ -32,6 +32,7 @@ class VideoFrameSampler():
             assert dtype == np.uint8 and self.resize_shape is None
             if not to_rgb:
                 log.warn("bgr imag and torch transformer")
+        self.dtype = dtype
        
     def _get_vid_info(self, cap_open=None):
         if cap_open is None:
