@@ -18,16 +18,16 @@ from torch.utils.data import DataLoader
 from asn.loss.metric_learning import NpairLoss as NPairLoss 
 from asn.loss.metric_learning import (LiftedStruct,LiftedCombined) 
 from asn.utils.comm import create_dir_if_not_exists, data_loader_cycle, create_label_func 
-from asn.train_utils import get_metric_info_multi_example, log_train, multi_vid_batch_loss 
+from asn.utils.train_utils import get_metric_info_multi_example, log_train, multi_vid_batch_loss 
 from asn.model.asn import create_model, save_model 
-from asn.train_utils import get_dataloader_val, get_dataloader_train 
-from asn.train_utils import get_train_transformer  
+from asn.utils.train_utils import get_dataloader_val, get_dataloader_train 
+from asn.utils.train_utils import get_train_transformer  
 
 
 from asn.utils.dataset import DoubleViewPairDataset 
 from asn.utils.log import log 
-from asn.train_utils import init_log_tb
-from asn.train_utils import grad_reverse, combi_push_stack_color_to_task, _fit_task_label
+from asn.utils.train_utils import init_log_tb
+from asn.utils.train_utils import grad_reverse, combi_push_stack_color_to_task, _fit_task_label
 from asn.val.alignment import view_pair_alignment_loss 
 from asn.val.classification_accuracy import accuracy, accuracy_batch 
 from asn.val.embedding_visualization import visualize_embeddings 
