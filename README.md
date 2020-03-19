@@ -45,7 +45,7 @@ After cd-ing to the repo install it with:<br>
 
 
 ## Training
-```CUDA_VISIBLE_DEVICES=1 python train_gan_entro.py --train-dir /tmp/real_combi_task3/videos/train/ --val-dir-metric /tmp/real_combi_task3/videos/val/ --save-folder ~/skills/experiments_real/num_frames/stride15_num2_abd_to_c  --train-filter-tasks cstack ```<br>
+```CUDA_VISIBLE_DEVICES=0 python train_asn.py --train-dir /tmp/real_combi_task3/videos/train/ --val-dir-metric /tmp/real_combi_task3/videos/val/ --save-folder ~/tmp/abd_to_c  --train-filter-tasks cstack ```<br>
 
 
 ## Evaluation

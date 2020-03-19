@@ -28,7 +28,7 @@ import datetime
 import logging
 import os
 from contextlib import contextmanager
-from torchtcn.utils.comm import create_dir_if_not_exists
+from asn.utils.comm import create_dir_if_not_exists
 
 LOG_LEVEL = int(os.getenv('BR_GYM_LOG_LEVEL', logging.INFO))
 datefmt = "%H:%M:%S"
