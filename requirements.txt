@@ -2,7 +2,7 @@ cmake
 numpy
 scipy
 torch==1.1.0
-pillow
+pillow==6.0.0
 torchvision==0.3.0
 sklearn
 opencv-python

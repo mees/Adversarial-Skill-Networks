@@ -19,8 +19,7 @@ from asn.loss.metric_learning import LiftedStruct, TripletLoss
 from asn.loss.metric_learning import NpairLoss as NPairLoss
 from asn.loss.metric_learning import LiftedCombined
 from asn.utils.comm import distance, get_git_commit_hash, create_dir_if_not_exists, sliding_window
-from asn.utils.dataset import (DoubleViewPairDataset,
-                                    MultiViewVideoDataset, ViewPairDataset)
+from asn.utils.dataset import (DoubleViewPairDataset, ViewPairDataset)
 from asn.utils.log import log, set_log_file
 from asn.utils.sampler import ViewPairSequenceSampler
 from torchvision import transforms
@@ -138,11 +137,7 @@ def get_dataloader_train(dir_vids, num_views, batch_size, criterion, use_cuda, i
                                           examples_per_sequence=examples_per_batch,
                                           # similar_frame_margin=3,# TODO
                                           batch_size=batch_size)
-    else:
-        transformed_dataset_train = MultiViewVideoDataset(vid_dir=dir_vids,
-                                                          number_views=num_views,
-                                                          # similar_frame_margin=sim_frames,
-                                                          transform_frames=transformer_train)
+    
     dataloader_train = DataLoader(transformed_dataset_train, drop_last=True,
                                   batch_size=batch_size,
                                   shuffle=shuffle,
