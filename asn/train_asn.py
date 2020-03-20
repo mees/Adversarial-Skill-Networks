@@ -56,7 +56,7 @@ def get_args():
     parser.add_argument('--loss', type=str,help="metric loss lifted or liftedcombi", default="lifted")
     parser.add_argument('--lr-start', type=float, default=0.0001)
     parser.add_argument('--num-views', type=int, default=2)
-    parser.add_argument('--no-tsne', action='store_false')
+    parser.add_argument('--plot-tsne', action='store_true')
     parser.add_argument('--num-domain-frames', type=int, default=2)
     parser.add_argument('--multi-domain-frames-stride', type=int, default=15)
     parser.add_argument('--label-mode', default='task', type=str,help="use task id or task sector lable output for D.")
@@ -543,7 +543,7 @@ if __name__ == '__main__':
                 writer.add_scalar('validation/loss_val_domain', loss_val_domain, global_step)
                 log.info('val domain acc: {}'.format(acc))
 
-            if not args.no_tsne and global_step % 20000 == 0:
+            if  args.plot_tsne and global_step % 20000 == 0:
                 def emb_only(d):
                     return model_forward(d,to_numpy=False)[0]
                 visualize_embeddings(emb_only, dataloader_val, summary_writer=None,
