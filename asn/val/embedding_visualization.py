@@ -215,7 +215,7 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer,
         X_tsne = TSNE_multi(n_jobs=4, perplexity=40).fit_transform(
 	    embeddings)  # perplexity = 40, theta=0.5
         create_time_vid(X_tsne,labels_frame_idx,vid_len_frame_idx)
-        plot_embedding(X_tsne, labels, title=tag+"mulit-t-sne_perplexity40_theta0.5_step" +
+        plot_embedding(X_tsne, labels, title=tag+"multi-t-sne_perplexity40_theta0.5_step" +
               str(global_step)+rnn_tag, imgs=imgs, save_dir=save_dir,
               frame_lable=labels_frame_idx, max_frame=vid_len_frame_idx,
               vid_lable=view_pair_name_labels)
@@ -338,7 +338,7 @@ def plot_embedding(X, labels_str, title, imgs=None, save_dir=None, frame_lable=N
         plt_labled_data(ax, X, vid_lable,
                         lable_filter_legend=lambda x: False)
 
-        ax.set_title("view pair as lable")
+        ax.set_title("view pair as label")
 
     if save_dir is not None:
         create_dir_if_not_exists(save_dir)
