@@ -56,7 +56,7 @@ def get_args():
     parser.add_argument('--loss', type=str,help="metric loss lifted or liftedcombi", default="lifted")
     parser.add_argument('--lr-start', type=float, default=0.0001)
     parser.add_argument('--num-views', type=int, default=2)
-    parser.add_argument('--plot-tsne', action='store_true')
+    parser.add_argument('--plot-tsne', action="store_true")
     parser.add_argument('--num-domain-frames', type=int, default=2)
     parser.add_argument('--multi-domain-frames-stride', type=int, default=15)
     parser.add_argument('--label-mode', default='task', type=str,help="use task id or task sector lable output for D.")
