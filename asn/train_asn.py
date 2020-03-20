@@ -53,7 +53,7 @@ def get_args():
     parser.add_argument('--val-dir-domain',
                         type=str, default=None)
     parser.add_argument('--batch-size', type=int, default=16)
-    parser.add_argument('--loss', type=str,help="metric loss lifted or liftedcombi", default="lifted")
+    parser.add_argument('--loss', type=str,help="metric loss lifted or liftedcombi", default="liftedcombi")
     parser.add_argument('--lr-start', type=float, default=0.0001)
     parser.add_argument('--num-views', type=int, default=2)
     parser.add_argument('--plot-tsne', action="store_true", default=True)
