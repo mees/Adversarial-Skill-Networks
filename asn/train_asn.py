@@ -13,24 +13,22 @@ from sklearn import preprocessing
 from tensorboardX import SummaryWriter
 from torch import multiprocessing, optim
 from torch.autograd import Variable
-from torch.optim import lr_scheduler
-from torch.utils.data import DataLoader 
-from asn.loss.metric_learning import NpairLoss as NPairLoss 
-from asn.loss.metric_learning import (LiftedStruct,LiftedCombined) 
-from asn.utils.comm import create_dir_if_not_exists, data_loader_cycle, create_label_func 
-from asn.utils.train_utils import get_metric_info_multi_example, log_train, multi_vid_batch_loss 
-from asn.model.asn import create_model, save_model 
-from asn.utils.train_utils import get_dataloader_val, get_dataloader_train 
-from asn.utils.train_utils import get_train_transformer  
+from torch.utils.data import DataLoader
+from asn.loss.metric_learning import (LiftedStruct,LiftedCombined)
+from asn.utils.comm import create_dir_if_not_exists, data_loader_cycle, create_label_func
+from asn.utils.train_utils import get_metric_info_multi_example, log_train, multi_vid_batch_loss
+from asn.model.asn import create_model, save_model
+from asn.utils.train_utils import get_dataloader_val, get_dataloader_train
+from asn.utils.train_utils import get_train_transformer
 
 
-from asn.utils.dataset import DoubleViewPairDataset 
-from asn.utils.log import log 
+from asn.utils.dataset import DoubleViewPairDataset
+from asn.utils.log import log
 from asn.utils.train_utils import init_log_tb
 from asn.utils.train_utils import grad_reverse, combi_push_stack_color_to_task, _fit_task_label
-from asn.val.alignment import view_pair_alignment_loss 
-from asn.val.classification_accuracy import accuracy, accuracy_batch 
-from asn.val.embedding_visualization import visualize_embeddings 
+from asn.val.alignment import view_pair_alignment_loss
+from asn.val.classification_accuracy import accuracy, accuracy_batch
+from asn.val.embedding_visualization import visualize_embeddings
 from torchvision.utils import save_image
 from torch.backends import cudnn
 from asn.utils.sampler import RNNViewPairSequenceSampler
@@ -279,7 +277,7 @@ if __name__ == '__main__':
     #in_channels = 1024*num_domain_frames  # out of SpatialSoftmax tcn
     if args.mode_input=='emb':
         in_channels = 32 # out of tcn
-   
+
 
     # Discriminator network with iputs outputs depending on the args settings
     net_input=in_channels*num_domain_frames if args.mode_input !='dist' else in_channels
@@ -413,7 +411,7 @@ if __name__ == '__main__':
         sample_batched_domain=next(iter_domain)
         lable_domain = sample_batched_domain['domain task lable']
         lable_domain = Variable(torch.cat([lable_domain, lable_domain])).cuda()
-        
+
         img_domain = torch.cat([sample_batched_domain[key_views[0]],
                                  sample_batched_domain[key_views[1]]])
         emb_tcn, kl_loss_tcn_domain =model_forward_domain(Variable(img_domain))
@@ -425,20 +423,20 @@ if __name__ == '__main__':
             emb_tcn=emb_tcn.view(bl//num_domain_frames,num_domain_frames*emb_size)
             # mask out lable for cat view
             mask = torch.ByteTensor([i%num_domain_frames==0 for i in range(bl)]).cuda()
-            
+
             lable_domain=lable_domain.masked_select(mask)
-              
+
         if args.mode_dist=='kl':
             kl_loss, d_out_gen = d_net(emb_tcn)
             d_out_gen= d_out_gen[0]
-            
+
         # min the entro for diffent classes
         optimizer_g.zero_grad()
         optimizer_d.zero_grad()
 
         loss_entro = criterion_entro(d_out_gen)
         retain_graph=True
-        
+
         if  args.mode=='cat-gan':
             #ensure equal usage of fake samples
             loss_g=loss_metric*0.1
