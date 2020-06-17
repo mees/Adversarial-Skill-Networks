@@ -87,7 +87,8 @@ def multi_vid_batch_loss(criterion_metric, batch, targets, n_views ,num_vid_exam
 def get_train_transformer(img_size=299):
     transformer_train = transforms.Compose([
         transforms.ToPILImage(),
-	transforms.CenterCrop(img_size),
+        # transforms.Resize([img_size,img_size]),
+        transforms.RandomResizedCrop(img_size, scale=(0.9, 1.0)), # for real data
         transforms.RandomHorizontalFlip(),
         transforms.ColorJitter(brightness=0.3,
                                contrast=0.3,
@@ -95,20 +96,19 @@ def get_train_transformer(img_size=299):
                                saturation=0.3),
         transforms.ToTensor(),
         # normalize https://pytorch.org/docs/master/torchvision/models.html
-#       transforms.Normalize([0.485, 0.456, 0.406],
-#                             [0.229, 0.224, 0.225])
+      transforms.Normalize([0.485, 0.456, 0.406],
+                            [0.229, 0.224, 0.225])
     ])
     return transformer_train
 
 def get_val_transformer(img_size=299):
     transformer_val = transforms.Compose([
         transforms.ToPILImage(),  # expects rgb, moves channel to front
-	 # transforms.Resize(img_size),
-       transforms.CenterCrop(img_size),  # TODO original tcn with center crop
+        transforms.Resize([img_size,img_size]),
         transforms.ToTensor(),  # imgae 0-255 to 0. - 1.0
         # normalize https://pytorch.org/docs/master/torchvision/models.html
-#        transforms.Normalize([0.485, 0.456, 0.406],
-#                             [0.229, 0.224, 0.225])
+       transforms.Normalize([0.485, 0.456, 0.406],
+                            [0.229, 0.224, 0.225])
     ])
     return transformer_val
 
@@ -284,7 +284,7 @@ def log_train(writer,mi,loss_metric,criterion_metric,global_step):
         # log.info("dot pos: {:.4} dot neg: {:.4}".format(product_pos, product_neg))
         writer.add_scalar('train/loss' + criterion_metric.__class__.__name__,
                           loss_metric, global_step)
-        writer.add_scalars('train/distane',
+        writer.add_scalars('train/distance',
                            {'positive':  mi['dist pos'],
                             'negative': mi['dist neg']}, global_step)
         writer.add_scalars('train/product',

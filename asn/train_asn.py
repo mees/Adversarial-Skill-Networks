@@ -45,13 +45,12 @@ def get_args():
                         type=str, default=None)
     parser.add_argument('--batch-size', type=int, default=16)
     parser.add_argument('--loss', type=str,help="metric loss lifted or liftedcombi", default="liftedcombi")
-    parser.add_argument('--lr-start', type=float, default=0.0001)
+    parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--num-views', type=int, default=2)
     parser.add_argument('--plot-tsne', action="store_true", default=True)
     parser.add_argument('--num-domain-frames', type=int, default=2)
     parser.add_argument('--multi-domain-frames-stride', type=int, default=15)
-    parser.add_argument('--train-filter-tasks',
-            help="task names to filter for training data, format, taskx,taskb. videos with the file name will be filtered", type=str, default=None)
+    parser.add_argument('--train-filter-tasks',help="task names to filter for training data, format, taskx,taskb. videos with the file name will be filtered", type=str, default=None)
     parser.add_argument('--num-example-batch',help="num example per batch each vid, only lifted loss support", type=int, default=4)
     return parser.parse_args()
 
@@ -75,6 +74,7 @@ if __name__ == '__main__':
     log.info("args: {}".format(args))
     writer = init_log_tb(args.save_folder)
     use_cuda = torch.cuda.is_available()
+    print('use_cuda: {}'.format(use_cuda))
     criterion = {"lifted":LiftedStruct(),"liftedcombi":LiftedCombined()}[args.loss]
     log.info("criterion: for {} ".format(
         criterion.__class__.__name__))
@@ -86,7 +86,7 @@ if __name__ == '__main__':
         use_cuda, args.load_model)
     log.info('asn: {}'.format(asn.__class__.__name__))
 
-    img_size=128
+    img_size=299
 
     # var for train info
     loss_val_min = None
@@ -167,6 +167,7 @@ if __name__ == '__main__':
         d_net.cuda()
 
     def model_forward(frame_batch, to_numpy=True):
+        print('frame_batch: {}'.format(frame_batch.size()))
         if use_cuda:
             frame_batch = frame_batch.cuda()
         emb = asn.forward(frame_batch)
@@ -180,8 +181,8 @@ if __name__ == '__main__':
 
     params = filter(lambda p: p.requires_grad, asn.parameters())
 
-    optimizer_g = optim.Adam(params, lr=args.lr_start)
-    optimizer_d = optim.Adam(d_net.parameters(), lr=args.lr_start)
+    optimizer_g = optim.Adam(params, lr=args.lr)
+    optimizer_d = optim.Adam(d_net.parameters(), lr=args.lr)
 
     key_views = ["frames views {}".format(i) for i in range(args.num_views)]
     iter_metric=iter(data_loader_cycle(dataloader_train))
@@ -192,6 +193,9 @@ if __name__ == '__main__':
 
 
     for epoch in range(start_epoch, args.steps):
+
+        optimizer_g.zero_grad()
+        optimizer_d.zero_grad()
 
         global_step += 1
         sample_batched=next(iter_metric)
@@ -233,40 +237,36 @@ if __name__ == '__main__':
             mask = torch.ByteTensor([i%num_domain_frames==0 for i in range(bl)]).cuda()
 
         kl_loss, d_out_gen = d_net(emb_tcn)
-        d_out_gen= d_out_gen[0]
+        # d_out_gen= d_out_gen[0]
 
-        # min the entro for diffent classes
-        optimizer_g.zero_grad()
-        optimizer_d.zero_grad()
 
 
         loss_g=loss_metric*0.1
 
         # max entro
-        entropy1_fake = entropy(d_out_gen)
-        entropy1_fake.backward(one, retain_graph=True)
-        entorpy_margin = marginalized_entropy(d_out_gen)
-        # #ensure equal usage of fake samples
-        entorpy_margin.backward(mone, retain_graph=True)
-        loss_g=loss_metric
+                        # entropy1_fake = entropy(d_out_gen)
+                        # entropy1_fake.backward(one, retain_graph=True)
+                        # entorpy_margin = marginalized_entropy(d_out_gen)
+                        # # #ensure equal usage of fake samples
+                        # entorpy_margin.backward(mone, retain_graph=True)
         loss_g.backward(retain_graph=True)
         optimizer_g.step()
 
         # update the Discriminator
-        optimizer_g.zero_grad()
-        optimizer_d.zero_grad()
+#         optimizer_g.zero_grad()
+        # optimizer_d.zero_grad()
 
-        # maximize marginalized entropy over real samples to ensure equal usage
-        entorpy_margin = marginalized_entropy(d_out_gen)
-        entorpy_margin.backward(mone,retain_graph=True)
-        # minimize entropy to make certain prediction of real sample
-        entropy1_real = entropy(d_out_gen)
+        # # maximize marginalized entropy over real samples to ensure equal usage
+        # entorpy_margin = marginalized_entropy(d_out_gen)
+        # entorpy_margin.backward(mone,retain_graph=True)
+        # # minimize entropy to make certain prediction of real sample
+        # entropy1_real = entropy(d_out_gen)
 
-        entropy1_real.backward(mone,retain_graph=True)
+        # entropy1_real.backward(mone,retain_graph=True)
 
-        kl_loss.backward()
+        # kl_loss.backward()
 
-        optimizer_d.step()
+        # optimizer_d.step()
 
         # var to monitor the training
         if global_step ==1:
@@ -277,7 +277,7 @@ if __name__ == '__main__':
             save_image(sample_batched[key_views[1]], os.path.join(args.save_folder,"images/tcn_veiw1.png"))
             save_image(img, os.path.join(args.save_folder,"images/all.png"))
 
-        if global_step % 100 == 0 or global_step == 1:
+        if global_step % 10 == 0 or global_step == 1:
             # log train dist
             loss_metric = np.asscalar(loss_g.data.cpu().numpy())
 
@@ -286,7 +286,7 @@ if __name__ == '__main__':
             # log training info
             log_train(writer,mi,loss_metric,criterion,global_step)
 
-        if global_step % 1000 == 0:
+        if global_step % 1 == 0:
             # valGidation
             log.info("==============================")
             asn.eval()
