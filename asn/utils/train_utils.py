@@ -278,7 +278,6 @@ def get_metric_info_multi_example(anchor_emb,positive_emb):
 
 def log_train(writer,mi,loss_metric,criterion_metric,global_step):
         ''' log to tb and pritn log msg '''
-        log.info('mi: {}'.format(mi))
         msg = "steps {}, dist: pos {:.2},neg {:.2},neg cos dist: pos {:.2},cos_neg {:.2}, loss metric:{:.3}".format(
             global_step, mi['dist pos'], mi["dist neg"], mi['dist pos cos'], mi['dist neg cos'],loss_metric)
         log.info(msg)

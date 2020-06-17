@@ -40,7 +40,7 @@ def get_args():
     parser.add_argument('--task', type=str, default="cstack",help='dataset, load tasks for real block data (cstack)')
     parser.add_argument('--train-dir', type=str, default='~/data/train/')
     parser.add_argument('--val-dir-metric',
-                        type=str, default='~/tcn_data/val')
+                        type=str, default='~/asn_data/val')
     parser.add_argument('--val-dir-domain',
                         type=str, default=None)
     parser.add_argument('--batch-size', type=int, default=16)
@@ -277,7 +277,7 @@ if __name__ == '__main__':
             save_image(sample_batched[key_views[1]], os.path.join(args.save_folder,"images/tcn_veiw1.png"))
             save_image(img, os.path.join(args.save_folder,"images/all.png"))
 
-        if global_step % 1 == 0 or global_step == 1:
+        if global_step % 100 == 0 or global_step == 1:
             # log train dist
             loss_metric = np.asscalar(loss_g.data.cpu().numpy())
 
@@ -286,7 +286,7 @@ if __name__ == '__main__':
             # log training info
             log_train(writer,mi,loss_metric,criterion,global_step)
 
-        if global_step % 10 == 0:
+        if global_step % 1000 == 0:
             # valGidation
             log.info("==============================")
             asn.eval()
