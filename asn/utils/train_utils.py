@@ -87,7 +87,6 @@ def multi_vid_batch_loss(criterion_metric, batch, targets, n_views ,num_vid_exam
 def get_train_transformer(img_size=299):
     transformer_train = transforms.Compose([
         transforms.ToPILImage(),
-        # transforms.Resize([img_size,img_size]),
         transforms.RandomResizedCrop(img_size, scale=(0.9, 1.0)), # for real data
         transforms.RandomHorizontalFlip(),
         transforms.ColorJitter(brightness=0.3,

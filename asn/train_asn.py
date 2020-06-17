@@ -167,7 +167,6 @@ if __name__ == '__main__':
         d_net.cuda()
 
     def model_forward(frame_batch, to_numpy=True):
-        print('frame_batch: {}'.format(frame_batch.size()))
         if use_cuda:
             frame_batch = frame_batch.cuda()
         emb = asn.forward(frame_batch)
@@ -237,45 +236,43 @@ if __name__ == '__main__':
             mask = torch.ByteTensor([i%num_domain_frames==0 for i in range(bl)]).cuda()
 
         kl_loss, d_out_gen = d_net(emb_tcn)
-        # d_out_gen= d_out_gen[0]
-
-
+        d_out_gen= d_out_gen[0]
 
         loss_g=loss_metric*0.1
 
         # max entro
-                        # entropy1_fake = entropy(d_out_gen)
-                        # entropy1_fake.backward(one, retain_graph=True)
-                        # entorpy_margin = marginalized_entropy(d_out_gen)
-                        # # #ensure equal usage of fake samples
-                        # entorpy_margin.backward(mone, retain_graph=True)
+        entropy1_fake = entropy(d_out_gen)
+        entropy1_fake.backward(one, retain_graph=True)
+        entorpy_margin = marginalized_entropy(d_out_gen)
+        # #ensure equal usage of fake samples
+        entorpy_margin.backward(mone, retain_graph=True)
         loss_g.backward(retain_graph=True)
         optimizer_g.step()
 
         # update the Discriminator
-#         optimizer_g.zero_grad()
-        # optimizer_d.zero_grad()
+        optimizer_g.zero_grad()
+        optimizer_d.zero_grad()
 
-        # # maximize marginalized entropy over real samples to ensure equal usage
-        # entorpy_margin = marginalized_entropy(d_out_gen)
-        # entorpy_margin.backward(mone,retain_graph=True)
-        # # minimize entropy to make certain prediction of real sample
-        # entropy1_real = entropy(d_out_gen)
+        # maximize marginalized entropy over real samples to ensure equal usage
+        entorpy_margin = marginalized_entropy(d_out_gen)
+        entorpy_margin.backward(mone,retain_graph=True)
+        # minimize entropy to make certain prediction of real sample
+        entropy1_real = entropy(d_out_gen)
 
-        # entropy1_real.backward(mone,retain_graph=True)
+        entropy1_real.backward(mone,retain_graph=True)
 
-        # kl_loss.backward()
+        kl_loss.backward()
 
-        # optimizer_d.step()
+        optimizer_d.step()
 
         # var to monitor the training
-        if global_step ==1:
-            create_dir_if_not_exists(os.path.join(args.save_folder,"images/"))
-            save_image(sample_batched_domain[key_views[0]], os.path.join(args.save_folder,"images/tcn_view0_domain.png"))
-            save_image(sample_batched_domain[key_views[1]], os.path.join(args.save_folder,"images/tcn_view1_domain.png"))
-            save_image(sample_batched[key_views[0]], os.path.join(args.save_folder,"images/tcn_view0.png"))
-            save_image(sample_batched[key_views[1]], os.path.join(args.save_folder,"images/tcn_veiw1.png"))
-            save_image(img, os.path.join(args.save_folder,"images/all.png"))
+        # if global_step ==1:
+            # create_dir_if_not_exists(os.path.join(args.save_folder,"images/"))
+            # save_image(sample_batched_domain[key_views[0]], os.path.join(args.save_folder,"images/tcn_view0_domain.png"))
+            # save_image(sample_batched_domain[key_views[1]], os.path.join(args.save_folder,"images/tcn_view1_domain.png"))
+            # save_image(sample_batched[key_views[0]], os.path.join(args.save_folder,"images/tcn_view0.png"))
+            # save_image(sample_batched[key_views[1]], os.path.join(args.save_folder,"images/tcn_veiw1.png"))
+            # save_image(img, os.path.join(args.save_folder,"images/all.png"))
 
         if global_step % 10 == 0 or global_step == 1:
             # log train dist
@@ -286,7 +283,7 @@ if __name__ == '__main__':
             # log training info
             log_train(writer,mi,loss_metric,criterion,global_step)
 
-        if global_step % 1 == 0:
+        if global_step % 2 == 0:
             # valGidation
             log.info("==============================")
             asn.eval()
