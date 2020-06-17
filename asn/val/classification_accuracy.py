@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from asn.utils.comm import tensor_to_np
-from asn.utils.sampler import RNNViewPairSequenceSampler
+from asn.utils.sampler import SkilViewPairSequenceSampler
 from asn.utils.log import log
 from torch.nn import functional as F
 import matplotlib.pyplot as plt
@@ -31,9 +31,9 @@ def accuracy(data_loader, model_forward, criterion,img_keys,lable_keys, n_batch=
     class_predictions={}
     num_domain_frames=1
     repeat_cnt=1
-    if isinstance(data_loader.sampler,RNNViewPairSequenceSampler):
+    if isinstance(data_loader.sampler,SkilViewPairSequenceSampler):
         num_domain_frames= data_loader.sampler._sequence_length
-        repeat_cnt=20 
+        repeat_cnt=20
     data_cnt=0
     for _ in range(repeat_cnt):
         for batch_iter, sampels in enumerate(data_loader):

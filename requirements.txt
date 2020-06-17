@@ -15,4 +15,3 @@ scikit-video
 tqdm
 gitpython
 colorlog
-pretrainedmodels
