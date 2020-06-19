@@ -47,7 +47,7 @@ def get_args():
     parser.add_argument('--loss', type=str,help="metric loss lifted or liftedcombi", default="liftedcombi")
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--num-views', type=int, default=2)
-    parser.add_argument('--plot-tsne', action="store_true", default=True)
+    parser.add_argument('--plot-tsne', action="store_true", default=False)
     parser.add_argument('--num-domain-frames', type=int, default=2)
     parser.add_argument('--multi-domain-frames-stride', type=int, default=15)
     parser.add_argument('--train-filter-tasks',help="task names to filter for training data, format, taskx,taskb. videos with the file name will be filtered", type=str, default=None)
@@ -232,8 +232,6 @@ if __name__ == '__main__':
             bl=emb_tcn.size(0)
             emb_size=emb_tcn.size(1)
             emb_tcn=emb_tcn.view(bl//num_domain_frames,num_domain_frames*emb_size)
-            # mask out lable for cat view
-            mask = torch.ByteTensor([i%num_domain_frames==0 for i in range(bl)]).cuda()
 
         kl_loss, d_out_gen = d_net(emb_tcn)
         d_out_gen= d_out_gen[0]
@@ -283,15 +281,14 @@ if __name__ == '__main__':
             # log training info
             log_train(writer,mi,loss_metric,criterion,global_step)
 
-        if global_step % 2 == 0:
+        if global_step % 200 == 0:
             # valGidation
             log.info("==============================")
             asn.eval()
             d_net.eval()
 
-
-            if  args.plot_tsne and global_step % 20000 == 0:
-                visualize_embeddings(model_forward, dataloader_val, summary_writer=None,
+            if  args.plot_tsne and global_step % 1000 == 0:
+                visualize_embeddings(model_forward_domain, dataloader_val, summary_writer=None,
                                      global_step=global_step, save_dir=args.save_folder, lable_func=vid_name_to_task_func)
             loss_val, nn_dist, dist_view_pais, _ = view_pair_alignment_loss(model_forward,
                                                                                               args.num_views,
