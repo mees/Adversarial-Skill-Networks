@@ -119,9 +119,8 @@ class SpatialSoftmax(nn.Module):
         feature.shape height, width,
     '''
 
-    def __init__(self, height, width, channel, temperature=None, data_format='NCHW'):
+    def __init__(self, height, width, channel, temperature=None):
         super().__init__()
-        self.data_format = data_format
         self.height = height
         self.width = width
         self.channel = channel
@@ -144,11 +143,8 @@ class SpatialSoftmax(nn.Module):
     def forward(self, feature):
                 # Output:
         #   (N, C*2) x_0 y_0 ...
-        if self.data_format == 'NHWC':
-            feature = feature.transpose(1, 3).tranpose(
-                2, 3).view(-1, self.height * self.width)
-        else:
-            feature = feature.view(-1, self.height * self.width)
+        feature = feature.transpose(1, 3).tranpose(
+            2, 3).view(-1, self.height * self.width)
 
         softmax_attention = F.softmax(feature / self.temperature, dim=-1)
         expected_x = torch.sum(Variable(self.pos_x) *

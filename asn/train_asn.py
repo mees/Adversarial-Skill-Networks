@@ -27,7 +27,7 @@ from asn.val.embedding_visualization import visualize_embeddings
 from torchvision.utils import save_image
 from torch.backends import cudnn
 # For fast training
-cudnn.benchmark = True
+# cudnn.benchmark = True
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -85,7 +85,6 @@ if __name__ == '__main__':
     log.info('asn: {}'.format(asn.__class__.__name__))
 
     img_size=299
-    img_size=128 # DEBUG
 
     # var for train info
     loss_val_min = None
