@@ -292,8 +292,8 @@ class TCNModel(EmbeddingNet):
 
 
 def define_model(pretrained=True, **kwargs):
-    return MiniTCNModel()# DEDBUG
-    # return TCNModel(models.inception_v3(pretrained=pretrained), **kwargs)
+    # return MiniTCNModel()# DEDBUG faster model to load
+    return TCNModel(models.inception_v3(pretrained=pretrained), **kwargs)
 
 
 def create_model(use_cuda, load_model_file=None, **kwargs):

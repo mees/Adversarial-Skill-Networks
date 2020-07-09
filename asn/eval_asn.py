@@ -37,7 +37,7 @@ def get_args():
     parser.add_argument('--load-model', type=str, required=False)
     parser.add_argument('--val-dir-metric',
                         type=str, default='~/asn_data/val')
-    parser.add_argument('--batch-size', type=int, default=16)
+    parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--num-views', type=int, default=2)
     parser.add_argument('--task', type=str, default="cstack",help='dataset, load tasks for real block data (cstack)')
     return parser.parse_args()
@@ -73,11 +73,12 @@ if __name__ == '__main__':
         return emb # .data.cpu().numpy()
 
     asn.eval()
+    loss_val, *_ = view_pair_alignment_loss(model_forward,
+                                            args.num_views,
+                                            dataloader_val)
+    log.info('loss_val: {}'.format(loss_val))
     # lable function: task name to labe
     visualize_embeddings(model_forward, dataloader_val,
                          save_dir=args.save_folder,
                          lable_func=vid_name_to_task_func)
 
-    loss_val, nn_dist, dist_view_pais, _ = view_pair_alignment_loss(model_forward,
-                                                                    args.num_views,
-                                                                    dataloader_val)
