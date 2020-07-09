@@ -22,14 +22,13 @@ from torch.utils.data import DataLoader
 from asn.loss.metric_learning import (LiftedStruct,LiftedCombined)
 from asn.utils.comm import create_dir_if_not_exists, data_loader_cycle, create_label_func
 from asn.utils.train_utils import get_metric_info_multi_example, log_train, multi_vid_batch_loss
-from asn.model.asn import create_model, save_model
+from asn.model.asn import create_model
 
 from asn.utils.log import log
 from asn.utils.train_utils import get_dataloader_val, vid_name_to_task, val_fit_task_lable
 from asn.val.alignment import view_pair_alignment_loss
-from asn.val.classification_accuracy import accuracy, accuracy_batch
+from asn.val.classification_accuracy import accuracy
 from asn.val.embedding_visualization import visualize_embeddings
-from torchvision.utils import save_image
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -38,8 +37,9 @@ def get_args():
     parser.add_argument('--load-model', type=str, required=False)
     parser.add_argument('--val-dir-metric',
                         type=str, default='~/asn_data/val')
-    parser.add_argument('--batch-size', type=int, default=32)
+    parser.add_argument('--batch-size', type=int, default=16)
     parser.add_argument('--num-views', type=int, default=2)
+    parser.add_argument('--task', type=str, default="cstack",help='dataset, load tasks for real block data (cstack)')
     return parser.parse_args()
 
 
@@ -53,7 +53,6 @@ if __name__ == '__main__':
     asn, start_epoch, global_step, _, _ = create_model(
         use_cuda, args.load_model)
     log.info('asn: {}'.format(asn.__class__.__name__))
-    log.info('mdl train steps global_step: {}'.format(global_step))
 
     img_size=299
 
@@ -66,18 +65,16 @@ if __name__ == '__main__':
 
     if use_cuda:
         asn.cuda()
-        d_net.cuda()
 
-    def model_forward_np(frame_batch):
+    def model_forward(frame_batch):
         if use_cuda:
             frame_batch = frame_batch.cuda()
         emb = asn.forward(frame_batch)
-        return emb.data.cpu().numpy()
+        return emb # .data.cpu().numpy()
 
-    model_forward_domain=functools.partial(model_forward,to_numpy=False)
     asn.eval()
     # lable function: task name to labe
-    visualize_embeddings(model_forward_np, dataloader_val,
+    visualize_embeddings(model_forward, dataloader_val,
                          save_dir=args.save_folder,
                          lable_func=vid_name_to_task_func)
 

@@ -85,6 +85,7 @@ if __name__ == '__main__':
     log.info('asn: {}'.format(asn.__class__.__name__))
 
     img_size=299
+    img_size=128 # DEBUG
 
     # var for train info
     loss_val_min = None
