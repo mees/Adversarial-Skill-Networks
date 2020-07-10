@@ -76,7 +76,7 @@ class Conv2d(nn.Module):
 
     def forward(self, x):
         x = self.conv2d(x)
-        return F.relu(x, inplace=True)
+        return F.relu(x, inplace=False)
 
 
 class Flatten(nn.Module):
@@ -142,9 +142,7 @@ class SpatialSoftmax(nn.Module):
 
     def forward(self, feature):
                 # Output:
-        #   (N, C*2) x_0 y_0 ...
-        feature = feature.transpose(1, 3).transpose(
-            2, 3).contiguous().view(-1, self.height * self.width)
+        feature = feature.view(-1, self.height * self.width)
 
         softmax_attention = F.softmax(feature / self.temperature, dim=-1)
         expected_x = torch.sum(Variable(self.pos_x) *
@@ -279,16 +277,16 @@ class TCNModel(EmbeddingNet):
     def forward(self, x):
 
         feature = self._all_sequential_feature(x)
-        x = self._all_sequential_emb(feature)
+        y = self._all_sequential_emb(feature)
         if self.l2_normalize_output:
-            return self.normalize(x)
+            return self.normalize(y)
         else:
-            return x
+            return y
 
 
 
 def define_model(pretrained=True, **kwargs):
-    # return MiniTCNModel()# DEDBUG faster model to load
+#     return MiniTCNModel()# DEDBUG faster model to load
     return TCNModel(models.inception_v3(pretrained=pretrained), **kwargs)
 
 

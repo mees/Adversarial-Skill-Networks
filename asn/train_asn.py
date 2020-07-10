@@ -27,7 +27,7 @@ from asn.val.embedding_visualization import visualize_embeddings
 from torchvision.utils import save_image
 from torch.backends import cudnn
 # For fast training
-# cudnn.benchmark = True
+cudnn.benchmark = True
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -185,8 +185,9 @@ if __name__ == '__main__':
     iter_metric=iter(data_loader_cycle(dataloader_train))
     iter_domain=iter(data_loader_cycle(dataloader_train_domain))
 
-    mone = torch.FloatTensor([-1]).cuda()
-    one = torch.FloatTensor([1]).cuda()
+    
+    one = torch.tensor(1.0, dtype=torch.float).cuda()
+    mone = torch.tensor(-1.0, dtype=torch.float).cuda()
 
 
     for epoch in range(start_epoch, args.steps):
