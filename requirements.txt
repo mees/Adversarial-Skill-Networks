@@ -15,3 +15,4 @@ scikit-video
 tqdm
 gitpython
 colorlog
+pytorch-lightning

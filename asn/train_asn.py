@@ -25,12 +25,15 @@ from asn.val.alignment import view_pair_alignment_loss
 from asn.val.classification_accuracy import accuracy, accuracy_batch
 from asn.val.embedding_visualization import visualize_embeddings
 from torchvision.utils import save_image
+from collections import OrderedDict
 from torch.backends import cudnn
+import pytorch_lightning as pl
 # For fast training
 cudnn.benchmark = True
 
 def get_args():
     parser = argparse.ArgumentParser()
+    parser = pl.Trainer.add_argparse_args(parser)
     parser.add_argument('--start-epoch', type=int, default=1)
     parser.add_argument('--steps', type=int, default=1500000)
     parser.add_argument('--save-every', type=int, default=20)
@@ -52,268 +55,183 @@ def get_args():
     parser.add_argument('--num-example-batch',help="num example per batch each vid, only lifted loss support", type=int, default=4)
     return parser.parse_args()
 
+# class ConcatDataset(torch.utils.data.Dataset):
+#     def __init__(self, *datasets):
+#         self.datasets = datasets
+#
+#     def __getitem__(self, i):
+#         return tuple(d[i] for d in self.datasets)
+#
+#     def __len__(self):
+#         return min(len(d) for d in self.datasets)
 
-#marginalized entropy
-def marginalized_entropy(y):
-    y=F.softmax(y, dim=1)
-    y1 = y.mean(0)
-    y2 = -torch.sum(y1*torch.log(y1+1e-6))
-    return y2
+class ASN(pl.LightningModule):
+    def __init__(self, hparams):
+        super().__init__()
+        self.hparams = hparams
+        self.criterion = {"lifted": LiftedStruct(), "liftedcombi": LiftedCombined()}[self.hparams.loss]
+        self.asn_model, self.start_epoch, self.global_step, _, _ = create_model(
+             self.hparams.load_model)
+        self.in_channels = 32  # out embedding size of asn
+        # Discriminator network with iputs outputs depending on the args settings
+        self.net_input = self.in_channels * self.hparams.num_domain_frames
 
-def entropy(y):
-    y1 = F.softmax(y, dim=1) * F.log_softmax(y, dim=1)
-    y2 = 1.0/y.size(0)*y1.sum()
-    return y2
+        self.img_size = 299
+        # load function which maps video file name to task for different datasets
+        # not used for training only for evaluation
+        self.vid_name_to_task_func = vid_name_to_task(self.hparams.task)
+        self.train_filter_func = None
+        self.filter_func_domain = None
+        if self.hparams.train_filter_tasks is not None:
+            # filter out tasks by names for the training set
+            self.train_filter_tasks = self.hparams.train_filter_tasks.split(',')
+            log.info('train_filter_tasks: {}'.format(self.train_filter_tasks))
 
+            def train_filter_func(name, n_frames):
+                return all(task not in name for task in self.train_filter_tasks)  # ABD->C
 
-if __name__ == '__main__':
-
-    args = get_args()
-    log.info("args: {}".format(args))
-    writer = init_log_tb(args.save_folder)
-    use_cuda = torch.cuda.is_available()
-    print('use_cuda: {}'.format(use_cuda))
-    criterion = {"lifted":LiftedStruct(),"liftedcombi":LiftedCombined()}[args.loss]
-    log.info("criterion: for {} ".format(
-        criterion.__class__.__name__))
-    if use_cuda:
-        torch.cuda.seed()
-        criterion.cuda()
-
-    asn, start_epoch, global_step, _, _ = create_model(
-        use_cuda, args.load_model)
-    log.info('asn: {}'.format(asn.__class__.__name__))
-
-    img_size=299
-
-    # var for train info
-    loss_val_min = None
-    loss_val_min_step = 0
-
-    # load function which maps video file name to task for different datasets
-    # not used for training only for evaluation
-    vid_name_to_task_func=vid_name_to_task(args.task)
-
-    filter_func=None
-    dataloader_val = get_dataloader_val(args.val_dir_metric,
-                                        args.num_views, args.batch_size,use_cuda,filter_func)
-
-    train_filter_func=None
-    if args.train_filter_tasks is not None:
-        # filter out tasks by namnes for the training set
-        train_filter_tasks= args.train_filter_tasks.split(',')
-        log.info('train_filter_tasks: {}'.format(train_filter_tasks))
-        def train_filter_func(name, n_frames):
-            return all(task not in name for task in train_filter_tasks)#ABD->C
-    examples_per_seq=args.num_example_batch
-    dataloader_train = get_dataloader_train(args.train_dir, args.num_views, args.batch_size,
-                                                    use_cuda,
-                                                    img_size=img_size,
-                                                    filter_func=train_filter_func,
-                                                    examples_per_seq=examples_per_seq)
-
-    all_view_pair_names = dataloader_train.dataset.get_all_comm_view_pair_names()
-    all_view_pair_frame_lengths = dataloader_train.dataset.frame_lengths
-
-    # for every task one lable
-    transform_comm_name, num_domain_task_classes, task_names=val_fit_task_lable(vid_name_to_task_func,all_view_pair_names)
-    log.info('task mode task_names: {}'.format(task_names))
-
-    lable_funcs={'domain task lable':transform_comm_name}# add domain lables to the sample
-
-    num_domain_frames=args.num_domain_frames
-    log.info('num_domain_frames: {}'.format(num_domain_frames))
-
-    # embedding class
-    log.info('num_domain_frames: {}'.format(num_domain_frames))
-    #in_channels = 1024*num_domain_frames  # out of SpatialSoftmax tcn
-
-    in_channels = 32 # out embedding size of asn
-
-    # Discriminator network with iputs outputs depending on the args settings
-    net_input=in_channels*num_domain_frames
-    d_net = KlDiscriminator(net_input, H=500,z_dim=64,D_out= [num_domain_task_classes], grad_rev=False)
-
-    # DATA domain
-    # filter out fake examples and tasks for D net
-    stride=args.multi_domain_frames_stride
-    if args.train_filter_tasks is not None:
-        def filter_func_domain(name,frames_cnt):
-            ' return no fake exmaples for filtered tasks'
-            return "fake" not in name and all(task not in name for task in train_filter_tasks)
-    else:
-        def filter_func_domain(name,frames_cnt):
-            ' return no fake exmaples for filtered tasks'
-            return "fake" not in name
-
-    dataloader_train_domain = get_skill_dataloader(args.train_dir,
-                                                          args.num_views,
-                                                          args.batch_size,
-                                                          use_cuda,
-                                                          img_size=img_size,
-                                                          filter_func=filter_func_domain,
-                                                          lable_funcs=lable_funcs,
-                                                          num_domain_frames=num_domain_frames,
-                                                          stride=stride)
-
-
-    asn.train()
-
-
-    if use_cuda:
-        asn.cuda()
-        d_net.cuda()
-
-    def model_forward(frame_batch, to_numpy=True):
-        if use_cuda:
-            frame_batch = frame_batch.cuda()
-        emb = asn.forward(frame_batch)
-        if to_numpy:
-            return emb.data.cpu().numpy()
+            def filter_func_domain(name, frames_cnt):
+                ' return no fake exmaples for filtered tasks'
+                return "fake" not in name and all(task not in name for task in self.train_filter_tasks)
         else:
-            return emb
+            def filter_func_domain(name, frames_cnt):
+                ' return no fake exmaples for filtered tasks'
+                return "fake" not in name
+        self.dataloader_train = get_dataloader_train(self.hparams.train_dir, self.hparams.num_views, self.hparams.batch_size,
+                                                True,
+                                                img_size=self.img_size,
+                                                filter_func=self.train_filter_func,
+                                                examples_per_seq=self.hparams.num_example_batch)
+        all_view_pair_names = self.dataloader_train.dataset.get_all_comm_view_pair_names()
+        # for every task one lable
+        self.transform_comm_name, self.num_domain_task_classes, self.task_names = val_fit_task_lable(
+            self.vid_name_to_task_func,
+            all_view_pair_names)
+        log.info('task mode task_names: {}'.format(self.task_names))
+
+        self.lable_funcs = {'domain task lable': self.transform_comm_name}  # add domain lables to the sample
+        self.d_net = KlDiscriminator(self.net_input, H=500, z_dim=64, D_out=[self.num_domain_task_classes], grad_rev=False)
+        self.key_views = ["frames views {}".format(i) for i in range(self.hparams.num_views)]
+        self.dataloader_train_domain = get_skill_dataloader(self.hparams.train_dir,
+                                                       self.hparams.num_views,
+                                                       self.hparams.batch_size,
+                                                       True,
+                                                       img_size=self.img_size,
+                                                       filter_func=self.filter_func_domain,
+                                                       lable_funcs=self.lable_funcs,
+                                                       num_domain_frames=self.hparams.num_domain_frames,
+                                                       stride=self.hparams.multi_domain_frames_stride)
+        self.iter_domain = iter(data_loader_cycle(self.dataloader_train_domain))
 
 
-    model_forward_domain=functools.partial(model_forward,to_numpy=False)
 
-    params = filter(lambda p: p.requires_grad, asn.parameters())
-
-    optimizer_g = optim.Adam(params, lr=args.lr)
-    optimizer_d = optim.Adam(d_net.parameters(), lr=args.lr)
-
-    key_views = ["frames views {}".format(i) for i in range(args.num_views)]
-    iter_metric=iter(data_loader_cycle(dataloader_train))
-    iter_domain=iter(data_loader_cycle(dataloader_train_domain))
-
-    
-    one = torch.tensor(1.0, dtype=torch.float).cuda()
-    mone = torch.tensor(-1.0, dtype=torch.float).cuda()
+    def forward(self, frame_batch):
+        emb = self.asn_model.forward(frame_batch)
+        return emb
 
 
-    for epoch in range(start_epoch, args.steps):
-
-        optimizer_g.zero_grad()
-        optimizer_d.zero_grad()
-
-        global_step += 1
-        sample_batched=next(iter_metric)
-        # metric loss
-        img = torch.cat([sample_batched[key_views[0]],
-                         sample_batched[key_views[1]]])
-        embeddings = model_forward(Variable(img), False)
-        n = sample_batched[key_views[0]].size(0)
-
-        # labels metric loss from video seq.
-        label_positive_pair = np.arange(n)
-        labels = Variable(torch.Tensor(np.concatenate([label_positive_pair, label_positive_pair]))).cuda()
-
-        # METRIC loss
-        if examples_per_seq ==1:
-            loss_metric = criterion(embeddings, labels)
-        elif global_step ==1:
-            # loss and same debug input images
-            loss_metric = multi_vid_batch_loss(criterion,embeddings, labels,args.num_views,
-                                            num_vid_example=examples_per_seq,img_debug=img,
-                                            save_folder=args.save_folder)
-        else:
-            loss_metric = multi_vid_batch_loss(criterion,embeddings, labels,args.num_views,
-                                            num_vid_example=examples_per_seq)
+    def training_step(self, batch, batch_idx, optimizer_idx):
+        # one = torch.tensor(1.0, dtype=torch.float).cuda()
+        # mone = torch.tensor(-1.0, dtype=torch.float).cuda()
 
         # set input and targets
-        sample_batched_domain=next(iter_domain)
+        sample_batched_domain = next(self.iter_domain)
 
-        img_domain = torch.cat([sample_batched_domain[key_views[0]],
-                                 sample_batched_domain[key_views[1]]])
-        emb_tcn =model_forward_domain(Variable(img_domain))
-
-        if num_domain_frames !=1:
+        img_domain = torch.cat([sample_batched_domain[self.key_views[0]],
+                                sample_batched_domain[self.key_views[1]]])
+        img_domain = img_domain.type_as(batch[self.key_views[0]])
+        # emb_tcn = model_forward_domain(Variable(img_domain))
+        emb_tcn = self(Variable(img_domain))
+        if self.hparams.num_domain_frames != 1:
             # multiple frames as skills
-            bl=emb_tcn.size(0)
-            emb_size=emb_tcn.size(1)
-            emb_tcn=emb_tcn.view(bl//num_domain_frames,num_domain_frames*emb_size)
+            bl = emb_tcn.size(0)
+            emb_size = emb_tcn.size(1)
+            emb_tcn = emb_tcn.view(bl // self.hparams.num_domain_frames, self.hparams.num_domain_frames * emb_size)
+        kl_loss, d_out_gen = self.d_net(emb_tcn)
+        d_out_gen = d_out_gen[0]
 
-        kl_loss, d_out_gen = d_net(emb_tcn)
-        d_out_gen= d_out_gen[0]
+        # train generator
+        if optimizer_idx == 0:
+            # metric loss
+            img = torch.cat([batch[self.key_views[0]],
+                             batch[self.key_views[1]]])
+            embeddings = self(Variable(img))
+            n = batch[self.key_views[0]].size(0)
+            # labels metric loss from video seq.
+            label_positive_pair = np.arange(n)
+            labels = Variable(torch.Tensor(np.concatenate([label_positive_pair, label_positive_pair])))
 
-        loss_g=loss_metric*0.1
-
-        # max entro
-        entropy1_fake = entropy(d_out_gen)
-        entropy1_fake.backward(one, retain_graph=True)
-        entorpy_margin = marginalized_entropy(d_out_gen)
-        # #ensure equal usage of fake samples
-        entorpy_margin.backward(mone, retain_graph=True)
-        loss_g.backward(retain_graph=True)
-        optimizer_g.step()
-
-        # update the Discriminator
-        optimizer_g.zero_grad()
-        optimizer_d.zero_grad()
-
-        # maximize marginalized entropy over real samples to ensure equal usage
-        entorpy_margin = marginalized_entropy(d_out_gen)
-        entorpy_margin.backward(mone,retain_graph=True)
-        # minimize entropy to make certain prediction of real sample
-        entropy1_real = entropy(d_out_gen)
-
-        entropy1_real.backward(mone,retain_graph=True)
-
-        kl_loss.backward()
-
-        optimizer_d.step()
-
-        # var to monitor the training
-        # if global_step ==1:
-            # create_dir_if_not_exists(os.path.join(args.save_folder,"images/"))
-            # save_image(sample_batched_domain[key_views[0]], os.path.join(args.save_folder,"images/tcn_view0_domain.png"))
-            # save_image(sample_batched_domain[key_views[1]], os.path.join(args.save_folder,"images/tcn_view1_domain.png"))
-            # save_image(sample_batched[key_views[0]], os.path.join(args.save_folder,"images/tcn_view0.png"))
-            # save_image(sample_batched[key_views[1]], os.path.join(args.save_folder,"images/tcn_veiw1.png"))
-            # save_image(img, os.path.join(args.save_folder,"images/all.png"))
-
-        if global_step % 10 == 0 or global_step == 1:
-            # log train dist
-            loss_metric = np.asscalar(loss_g.data.cpu().numpy())
-
-            anchor_emb, positive_emb = embeddings[:n], embeddings[n:]
-            mi=get_metric_info_multi_example(anchor_emb.data.cpu().numpy(),positive_emb.data.cpu().numpy())
-            # log training info
-            log_train(writer,mi,loss_metric,criterion,global_step)
-
-        if global_step % 200 == 0:
-            # valGidation
-            log.info("==============================")
-            asn.eval()
-            d_net.eval()
-
-            if  args.plot_tsne and global_step % 1000 == 0:
-                visualize_embeddings(model_forward_domain, dataloader_val, summary_writer=None,
-                                     global_step=global_step, save_dir=args.save_folder, lable_func=vid_name_to_task_func)
-            loss_val, nn_dist, dist_view_pais, _ = view_pair_alignment_loss(model_forward,
-                                                                                              args.num_views,
-                                                                                              dataloader_val)
-            asn.train()
-            d_net.train()
-
-            writer.add_scalar('validation/alignment_loss',
-                              loss_val, global_step)
-            writer.add_scalar('validation/nn_distance',
-                              nn_dist, global_step)
-            writer.add_scalar(
-                'validation/distance_view_pairs_same_frame', dist_view_pais, global_step)
-
-            if loss_val_min is None or loss_val < loss_val_min:
-                loss_val_min = loss_val
-                loss_val_min_step = global_step
-                is_best = True
+            # METRIC loss
+            if self.hparams.num_example_batch == 1:
+                loss_metric = self.criterion(embeddings, labels)
+            elif self.trainer.global_step == 1:
+                # loss and same debug input images
+                loss_metric = multi_vid_batch_loss(self.criterion, embeddings, labels, self.hparams.num_views,
+                                                   num_vid_example=self.hparams.num_example_batch, img_debug=img,
+                                                   save_folder=self.hparams.save_folder)
             else:
-                is_best = False
-            msg= "Validation alignment epoch {} loss: {}, nn mean dist {:.3}, lowest loss {:.4} at {} steps".format(
-                epoch, loss_val, nn_dist, loss_val_min, loss_val_min_step)
-            log.info(msg)
-            print('msg: {}'.format(msg))
-            save_model(asn, optimizer_g, args, is_best,
-                       args.save_folder, epoch, global_step)
+                loss_metric = multi_vid_batch_loss(self.criterion, embeddings, labels, self.hparams.num_views,
+                                                   num_vid_example=self.hparams.num_example_batch)
 
-    writer.close()
 
+            # max entro
+            entropy1_fake = self.entropy(d_out_gen)
+            entropy_margin = self.marginalized_entropy(d_out_gen)
+            # #ensure equal usage of fake samples
+            loss_g = loss_metric * 0.1 + entropy1_fake + -1.0*entropy_margin
+
+            tqdm_dict = {'g_loss': loss_g}
+            output = OrderedDict({
+                'loss': loss_g,
+                'progress_bar': tqdm_dict,
+                'log': tqdm_dict
+            })
+            return output
+
+        if optimizer_idx == 1:
+                     # maximize marginalized entropy over real samples to ensure equal usage
+            entropy_margin = self.marginalized_entropy(d_out_gen)
+            # minimize entropy to make certain prediction of real sample
+            entropy1_real = self.entropy(d_out_gen)
+            d_loss = -1.0*entropy_margin + entropy1_real + kl_loss
+
+            tqdm_dict = {'d_loss': d_loss}
+            output = OrderedDict({
+                'loss': d_loss,
+                'progress_bar': tqdm_dict,
+                'log': tqdm_dict
+            })
+            return output
+
+    def train_dataloader(self):
+        return self.dataloader_train
+
+    # def val_dataloader(self):
+    #     dataloader_val = get_dataloader_val(self.hparams.val_dir_metric,
+    #                                         self.hparams.num_views, self.hparams.batch_size, True, None)
+    #     return dataloader_val
+
+    def configure_optimizers(self):
+        optimizer_g = torch.optim.Adam(self.asn_model.parameters(), lr=self.hparams.lr)
+        optimizer_d = torch.optim.Adam(self.d_net.parameters(), lr=self.hparams.lr)
+        return [optimizer_g, optimizer_d], []
+
+    # marginalized entropy
+    def marginalized_entropy(self, y):
+        y = F.softmax(y, dim=1)
+        y1 = y.mean(0)
+        y2 = -torch.sum(y1 * torch.log(y1 + 1e-6))
+        return y2
+
+    def entropy(self, y):
+        y1 = F.softmax(y, dim=1) * F.log_softmax(y, dim=1)
+        y2 = 1.0 / y.size(0) * y1.sum()
+        return y2
+
+if __name__ == '__main__':
+    args = get_args()
+    log.info("args: {}".format(args))
+
+    asn = ASN(hparams=args)
+    trainer = pl.Trainer.from_argparse_args(args)
+    trainer.fit(asn)
