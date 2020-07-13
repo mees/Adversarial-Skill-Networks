@@ -7,7 +7,7 @@ torchvision==0.5.0
 sklearn
 opencv-python
 matplotlib
-tensorboard==1.12
+tensorboard==1.14
 tensorboardX
 pandas
 MulticoreTSNE
