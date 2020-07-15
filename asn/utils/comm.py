@@ -262,8 +262,6 @@ def start_tb_task(path_tb,port=6006):
         print("ERROR start tensorboard failed, old version V1.12 supported, disable if no data is loaded")
 
 
-
-
 def data_loader_cycle(iterable):
     '''
     Using itertools.cycle has an important drawback, in that it does not shuffle the data after each iteration:

@@ -14,12 +14,15 @@ from tensorboardX import SummaryWriter
 from torch import multiprocessing, optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
+
+from pytorch_lightning import _logger as log
+# from asn.utils.log import log
+import asn
 from asn.loss.metric_learning import (LiftedStruct,LiftedCombined)
-from asn.utils.comm import create_dir_if_not_exists, data_loader_cycle, create_label_func
+from asn.utils.comm import create_dir_if_not_exists, get_git_commit_hash, create_label_func, data_loader_cycle
 from asn.utils.train_utils import get_metric_info_multi_example, log_train, multi_vid_batch_loss
 from asn.model.asn import create_model, save_model, KlDiscriminator
 
-from asn.utils.log import log
 from asn.utils.train_utils import init_log_tb,get_skill_dataloader,get_dataloader_val,vid_name_to_task,get_dataloader_train,val_fit_task_lable
 from asn.val.alignment import view_pair_alignment_loss
 from asn.val.classification_accuracy import accuracy, accuracy_batch
@@ -55,33 +58,13 @@ def get_args():
     parser.add_argument('--num-example-batch',help="num example per batch each vid, only lifted loss support", type=int, default=4)
     return parser.parse_args()
 
-# class ConcatDataset(torch.utils.data.Dataset):
-#     def __init__(self, *datasets):
-#         self.datasets = datasets
-#
-#     def __getitem__(self, i):
-#         return tuple(d[i] for d in self.datasets)
-#
-#     def __len__(self):
-#         return min(len(d) for d in self.datasets)
+class ASNConcatDataLoader(torch.utils.data.DataLoader):
 
-class ASN(pl.LightningModule):
     def __init__(self, hparams):
-        super().__init__()
-        self.hparams = hparams
-        self.criterion = {"lifted": LiftedStruct(), "liftedcombi": LiftedCombined()}[self.hparams.loss]
-        self.asn_model, self.start_epoch, self.global_step, _, _ = create_model(
-             self.hparams.load_model)
-        self.in_channels = 32  # out embedding size of asn
-        # Discriminator network with iputs outputs depending on the args settings
-        self.net_input = self.in_channels * self.hparams.num_domain_frames
-
-        self.img_size = 299
-        # load function which maps video file name to task for different datasets
-        # not used for training only for evaluation
-        self.vid_name_to_task_func = vid_name_to_task(self.hparams.task)
         self.train_filter_func = None
+        self.hparams=hparams
         self.filter_func_domain = None
+        self.img_size = 299
         if self.hparams.train_filter_tasks is not None:
             # filter out tasks by names for the training set
             self.train_filter_tasks = self.hparams.train_filter_tasks.split(',')
@@ -97,22 +80,24 @@ class ASN(pl.LightningModule):
             def filter_func_domain(name, frames_cnt):
                 ' return no fake exmaples for filtered tasks'
                 return "fake" not in name
+
         self.dataloader_train = get_dataloader_train(self.hparams.train_dir, self.hparams.num_views, self.hparams.batch_size,
                                                 True,
                                                 img_size=self.img_size,
                                                 filter_func=self.train_filter_func,
                                                 examples_per_seq=self.hparams.num_example_batch)
+
         all_view_pair_names = self.dataloader_train.dataset.get_all_comm_view_pair_names()
+        self.key_views = ["frames views {}".format(i) for i in range(self.hparams.num_views)]
         # for every task one lable
+        # used for validation
+        self.vid_name_to_task_func = vid_name_to_task(self.hparams.task)
         self.transform_comm_name, self.num_domain_task_classes, self.task_names = val_fit_task_lable(
             self.vid_name_to_task_func,
             all_view_pair_names)
-        log.info('task mode task_names: {}'.format(self.task_names))
-
+        log.info('train task names: {}'.format(self.task_names))
         self.lable_funcs = {'domain task lable': self.transform_comm_name}  # add domain lables to the sample
-        self.d_net = KlDiscriminator(self.net_input, H=500, z_dim=64, D_out=[self.num_domain_task_classes], grad_rev=False)
-        self.key_views = ["frames views {}".format(i) for i in range(self.hparams.num_views)]
-        self.dataloader_train_domain = get_skill_dataloader(self.hparams.train_dir,
+        self.dataloader_train_d = get_skill_dataloader(self.hparams.train_dir,
                                                        self.hparams.num_views,
                                                        self.hparams.batch_size,
                                                        True,
@@ -121,45 +106,64 @@ class ASN(pl.LightningModule):
                                                        lable_funcs=self.lable_funcs,
                                                        num_domain_frames=self.hparams.num_domain_frames,
                                                        stride=self.hparams.multi_domain_frames_stride)
-        self.iter_domain = iter(data_loader_cycle(self.dataloader_train_domain))
+        self.iter_d = iter(data_loader_cycle(self.dataloader_train_d))
+        self.iter_m = iter(data_loader_cycle(self.dataloader_train))
 
+    def __iter__(self):
+        return [next(self.iter_m),next(self.iter_d)]
 
+    def __len__(self):
+        return len(self.dataloader_train)
+
+class ASN(pl.LightningModule):
+    def __init__(self, hparams):
+        super().__init__()
+        log.info(get_git_commit_hash(asn.__file__))
+        self.hparams = hparams
+        self.criterion = {"lifted": LiftedStruct(), "liftedcombi": LiftedCombined()}[self.hparams.loss]
+        self.asn_model, self.start_epoch, self.global_step, _, _ = create_model(
+             self.hparams.load_model)
+        self.in_channels = 32  # out embedding size
+        # Discriminator network with iputs outputs depending on the args settings
+        self.net_input = self.in_channels * self.hparams.num_domain_frames
+
+        self.dataset = ASNConcatDataLoader(self.hparams)
+        # load function which maps video file name to task for different datasets
+        # not used for training only for evaluation
+
+        self.d_net = KlDiscriminator(self.net_input, H=500, z_dim=64, D_out=[self.dataset.num_domain_task_classes], grad_rev=False)
 
     def forward(self, frame_batch):
         emb = self.asn_model.forward(frame_batch)
         return emb
 
+    def _stack_multiview_vid(self,batch):
+        img = torch.cat([batch[k] for k in self.dataset.key_views])
+        n =batch[self.dataset.key_views[0]].size(0)
+        # labels metric loss from video seq.
+        label_positive_pair = np.arange(n)
+        labels = Variable(torch.Tensor(np.concatenate([label_positive_pair for _ in self.dataset.key_views])))
+        return img, labels
 
     def training_step(self, batch, batch_idx, optimizer_idx):
+        # print('batch: {}'.format(batch.keys()))
+        # print('optimizer_idx: {}'.format(optimizer_idx))
         # one = torch.tensor(1.0, dtype=torch.float).cuda()
         # mone = torch.tensor(-1.0, dtype=torch.float).cuda()
 
         # set input and targets
-        sample_batched_domain = next(self.iter_domain)
+        # d_out_gen = batch_d, batch_metric =batch
+        batch_metric = batch
+        batch_d = next(self.dataset.iter_d)
 
-        img_domain = torch.cat([sample_batched_domain[self.key_views[0]],
-                                sample_batched_domain[self.key_views[1]]])
-        img_domain = img_domain.type_as(batch[self.key_views[0]])
-        # emb_tcn = model_forward_domain(Variable(img_domain))
-        emb_tcn = self(Variable(img_domain))
-        if self.hparams.num_domain_frames != 1:
-            # multiple frames as skills
-            bl = emb_tcn.size(0)
-            emb_size = emb_tcn.size(1)
-            emb_tcn = emb_tcn.view(bl // self.hparams.num_domain_frames, self.hparams.num_domain_frames * emb_size)
-        kl_loss, d_out_gen = self.d_net(emb_tcn)
-        d_out_gen = d_out_gen[0]
-
+        kl_loss,d_out=self._d_forward(batch_d,batch_metric)
+        # maximize marginalized entropy over real samples to ensure equal usage
+        entropy_margin = self.marginalized_entropy(d_out)
         # train generator
         if optimizer_idx == 0:
             # metric loss
-            img = torch.cat([batch[self.key_views[0]],
-                             batch[self.key_views[1]]])
+            img,labels = self._stack_multiview_vid(batch_metric)
             embeddings = self(Variable(img))
-            n = batch[self.key_views[0]].size(0)
-            # labels metric loss from video seq.
-            label_positive_pair = np.arange(n)
-            labels = Variable(torch.Tensor(np.concatenate([label_positive_pair, label_positive_pair])))
 
             # METRIC loss
             if self.hparams.num_example_batch == 1:
@@ -175,8 +179,7 @@ class ASN(pl.LightningModule):
 
 
             # max entro
-            entropy1_fake = self.entropy(d_out_gen)
-            entropy_margin = self.marginalized_entropy(d_out_gen)
+            entropy1_fake = self.entropy(d_out)
             # #ensure equal usage of fake samples
             loss_g = loss_metric * 0.1 + entropy1_fake + -1.0*entropy_margin
 
@@ -189,10 +192,8 @@ class ASN(pl.LightningModule):
             return output
 
         if optimizer_idx == 1:
-                     # maximize marginalized entropy over real samples to ensure equal usage
-            entropy_margin = self.marginalized_entropy(d_out_gen)
             # minimize entropy to make certain prediction of real sample
-            entropy1_real = self.entropy(d_out_gen)
+            entropy1_real = self.entropy(d_out)
             d_loss = -1.0*entropy_margin + entropy1_real + kl_loss
 
             tqdm_dict = {'d_loss': d_loss}
@@ -203,8 +204,22 @@ class ASN(pl.LightningModule):
             })
             return output
 
+    def _d_forward(self, sample_batched_domain, batch_metric):
+
+        img_domain, _ = self._stack_multiview_vid(sample_batched_domain)
+        img_domain = img_domain.type_as(batch_metric[self.dataset.key_views[0]])
+        emb_tcn = self(Variable(img_domain))
+        if self.hparams.num_domain_frames != 1:
+            # multiple frames as skills
+            bl = emb_tcn.size(0)
+            emb_size = emb_tcn.size(1)
+            emb_tcn = emb_tcn.view(bl // self.hparams.num_domain_frames, self.hparams.num_domain_frames * emb_size)
+        kl_loss, d_out_gen = self.d_net(emb_tcn)
+        return kl_loss, d_out_gen[0]
+
+
     def train_dataloader(self):
-        return self.dataloader_train
+        return self.dataset.dataloader_train_d
 
     # def val_dataloader(self):
     #     dataloader_val = get_dataloader_val(self.hparams.val_dir_metric,
