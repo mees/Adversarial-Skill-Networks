@@ -280,5 +280,5 @@ def view_pair_alignment_loss(func_model_forward, n_views, data_loader, num_worke
         frame_distribution_pre.extend(error_hist_cnts)
     for p in knn_process:
         p.terminate()
-        p.join()  # One must call close() or terminate() before using join().
+        p.join()
     return np.mean(losses), np.mean(dists_nn), np.mean(dists_view_pair), frame_distribution_pre

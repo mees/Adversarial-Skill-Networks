@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from asn.utils.comm import distance
 from asn.utils.log import log
 
 def _pdist(A, squared=False, eps=1e-4):
@@ -39,9 +38,9 @@ class LiftedStruct(nn.Module):
         return loss
 
 
-class LiftedStructPosMin(nn.Module):
+class LiftedStructM(nn.Module):
     '''
-        min pos distance untill in margin
+        with margin
     '''
 
     def forward(self, embeddings, labels, margin=1.0, eps=1e-4):
@@ -70,7 +69,7 @@ class LiftedStructPosMin(nn.Module):
 class LiftedCombined(nn.Module):
     def __init__(self):
         super().__init__()
-        self.a=LiftedStructPosMin()
+        self.a=LiftedStructM()
         self.b=LiftedStruct()
 
     def forward(self, embeddings, labels, margin=1.0, eps=1e-4):

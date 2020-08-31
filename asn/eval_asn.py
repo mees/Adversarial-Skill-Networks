@@ -21,13 +21,11 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from asn.loss.metric_learning import (LiftedStruct,LiftedCombined)
 from asn.utils.comm import create_dir_if_not_exists, data_loader_cycle, create_label_func
-from asn.utils.train_utils import get_metric_info_multi_example, log_train, multi_vid_batch_loss
 from asn.model.asn import create_model
 
 from asn.utils.log import log
 from asn.utils.train_utils import get_dataloader_val, vid_name_to_task, val_fit_task_lable
 from asn.val.alignment import view_pair_alignment_loss
-from asn.val.classification_accuracy import accuracy
 from asn.val.embedding_visualization import visualize_embeddings
 
 def get_args():

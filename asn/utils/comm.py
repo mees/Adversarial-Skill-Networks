@@ -21,12 +21,6 @@ def ignorder_exception(*exs):
     except exs:
         pass
 
-
-def distance(x1, x2):
-    diff = torch.abs(x1 - x2)
-    return torch.pow(diff, 2).sum(dim=1)
-
-
 def ls_directories(path):
     return next(os.walk(path))[1]
 

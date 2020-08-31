@@ -47,10 +47,18 @@ After cd-ing to the repo install it with:<br>
 First download and extract the [dataset](http://robotskills.cs.uni-freiburg.de/dataset/real_block_tasks.zip) containing the block tasks into your /tmp/ directory. To start the training you need to specify the location of the dataset and which tasks you want to held out. For example, to train the skill embedding on the tasks 2 block stacking, color pushing and  separate to stack and evaluate it via video alignment on the unseen color stacking task:<br>
 
 ```
-python train_asn.py --train-dir /tmp/real_combi_task3/videos/train/ --val-dir-metric /tmp/real_combi_task3/videos/val/  --train-filter-tasks cstack
+python train_asn.py --train-dir /videos/train  --num-example-batch 1 --train-filter-tasks cstack --gpus 1 --batch-size 4 --loss lifted --num-workers 2
+
 ```
 
 
+
+## Evaluation
+
+```
+python  eval_asn.py --val-dir /videos/val --load-model /model/model_best.pth.tar 
+
+```
 
 ## Pretrained Model	
 We provide the weights, a log file and a t-SNE visualization for a pretrained model for the default setting [here](asn/pretrained_model.zip). This model achieves an alignment loss of 0.1662 on the unseen color stacking task, which is very close to the 0.165 reported on the paper.

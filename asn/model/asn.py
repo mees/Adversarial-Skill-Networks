@@ -17,9 +17,8 @@ from torchvision import models
 class KlDiscriminator(nn.Module):
     ''' dis with n dist '''
 
-    def __init__(self, D_in, H, z_dim, D_out, grad_rev):
+    def __init__(self, D_in, H, z_dim, D_out):
         super().__init__()
-        self._rev_grad=grad_rev
         self.z_dim=z_dim
         log.info('KlDiscriminator domain net in_channels: {} out: {} hidden {}, z dim {}'.format(D_in,D_out,H,z_dim))
         self.encoder = torch.nn.Sequential(
@@ -44,8 +43,6 @@ class KlDiscriminator(nn.Module):
             self.out_layer.append(out)
 
     def forward(self, x):
-        if self._rev_grad:
-            x=grad_reverse(x)
         enc = self.encoder(x)
         mu,logvar=self.l_mu(enc),self.l_var(enc)
         z = self.reparameterize(mu, logvar)
@@ -59,7 +56,6 @@ class KlDiscriminator(nn.Module):
         return mu + eps*std
 
     def kl_loss(self,mu, logvar):
-
         # see Appendix B from VAE paper:
         # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
         # https://arxiv.org/abs/1312.6114
@@ -95,18 +91,6 @@ class Dense(nn.Module):
         if self.activation is not None:
             x = self.activation(x)
         return x
-
-
-class EmbeddingNet(nn.Module):
-    def normalize(self, x):
-        # Normalize output such that output lives on unit sphere.
-        # buffer = torch.pow(x, 2)
-        # normp = torch.sum(buffer, 1).add_(1e-10)
-        # normalization_constant = torch.sqrt(normp)
-        # output = torch.div(x, normalization_constant.view(-1, 1).expand_as(x))
-        # return output
-        # L2n
-        return F.normalize(x, p=2, dim=1)
 
 
 class SpatialSoftmax(nn.Module):
@@ -154,50 +138,7 @@ class SpatialSoftmax(nn.Module):
 
         return feature_keypoints
 
-
-
-class MiniTCNModel(nn.Module):
-    '''
-        input is img 128x128
-    based on https://github.com/bhpfelix/Variational-Autoencoder-PyTorch/blob/master/src/vanila_vae.py'''
-    def __init__(self, nc=3, ndf=128,fc_hidden_sizes=1028, # 1024 todo
-                 embedding_size=32,
-                 dp_ratio_pretrained_act=0.2,dp_ratio_fc=0.3):
-        super().__init__()
-                # encoder
-        self.ndf=ndf
-        self.leakyrelu = nn.LeakyReLU(0.2)
-        self.e1 = nn.Conv2d(nc, ndf, 4, 2, 1)
-        self.bn1 = nn.BatchNorm2d(ndf)
-
-        self.e2 = nn.Conv2d(ndf, ndf*2, 4, 2, 1)
-        self.bn2 = nn.BatchNorm2d(ndf*2)
-
-        self.e3 = nn.Conv2d(ndf*2, ndf*4, 4, 2, 1)
-        self.bn3 = nn.BatchNorm2d(ndf*4)
-
-        self.e4 = nn.Conv2d(ndf*4, ndf*8, 4, 2, 1)
-        self.bn4 = nn.BatchNorm2d(ndf*8)
-        self.drop_h4 = nn.Dropout(dp_ratio_pretrained_act)
-
-        self.e5 = nn.Conv2d(ndf*8, ndf*8, 4, 2, 1)
-        self.bn5 = nn.BatchNorm2d(ndf*8)
-        self.drop_h5 = nn.Dropout(dp_ratio_pretrained_act)
-        self.fc1 =Dense(ndf*8*4*4, fc_hidden_sizes,activation=self.leakyrelu)
-        self.fc1_drop=nn.Dropout(p=dp_ratio_fc)
-        self.fc2 = nn.Linear(fc_hidden_sizes, embedding_size)
-
-    def forward(self, x):
-        h1 = self.leakyrelu(self.bn1(self.e1(x)))
-        h2 = self.leakyrelu(self.bn2(self.e2(h1)))
-        h3 = self.leakyrelu(self.bn3(self.e3(h2)))
-        h4 = self.drop_h4(self.leakyrelu(self.bn4(self.e4(h3))))
-        h5 = self.drop_h5(self.leakyrelu(self.bn5(self.e5(h4))))
-        h5 = h5.view(-1, self.ndf*8*4*4)
-        f1= self.fc1_drop(self.fc1(h5))
-        return self.fc2(f1)
-
-class TCNModel(EmbeddingNet):
+class TCNModel(nn.Module):
     """TCN Embedder V1.
 
     InceptionV3 (mixed_5d) -> conv layers -> spatial softmax ->
@@ -283,12 +224,11 @@ class TCNModel(EmbeddingNet):
         else:
             return y
 
-
+    def normalize(self, x):
+        return F.normalize(x, p=2, dim=1)
 
 def define_model(pretrained=True, **kwargs):
-#     return MiniTCNModel()# DEDBUG faster model to load
     return TCNModel(models.inception_v3(pretrained=pretrained), **kwargs)
-
 
 def create_model(use_cuda, load_model_file=None, **kwargs):
     asn = define_model(use_cuda, **kwargs)
@@ -308,35 +248,27 @@ def create_model(use_cuda, load_model_file=None, **kwargs):
         log.info("Restoring Model from: {}, epoch {}, step {}, datetime {}".format(
             load_model_file, start_epoch, start_step, checkpoint.get('datetime')))
 
-
     if use_cuda:
         asn = asn.cuda()
     return asn, start_epoch, start_step, optimizer_state_dict, training_args
 
 
-def save_model(model, optimizer, training_args, is_best, model_folder, epoch, step):
-    ''' '''
+def save_model(model, save_folder, epoch):
 
     state = {
         'datetime': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         'epoch': epoch,
-        'step': step,
-        'training_args': training_args,
         'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
     }
 
-    model_folder = os.path.expanduser(model_folder)
-    if not os.path.exists(model_folder):
-        os.makedirs(model_folder)
-    filename = os.path.join(model_folder, 'model.pth.tar')
+    save_folder = os.path.expanduser(save_folder)
+    if not os.path.exists(save_folder):
+        os.makedirs(save_folder)
+    filename = os.path.join(save_folder, 'model_epoch{}.pth.tar'.format(epoch))
     torch.save(state, filename)
 
     checkpoint = torch.load(filename)
 
-    log.info("Saved Model from: {}, epoch {}, step {}".format(
-        filename, epoch, step))
-    if is_best:
-        filename_copy = os.path.join(model_folder, 'model_best.pth.tar')
-        shutil.copyfile(filename, filename_copy)
-        log.info("copyed to model_best!")
+    log.info("Saved Model from: {}, epoch {}".format(
+        filename, epoch))
+

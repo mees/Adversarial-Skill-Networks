@@ -16,20 +16,19 @@ from torchvision.utils import save_image
 from torch.autograd import Variable
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
-from asn.utils.comm import distance, get_git_commit_hash, create_dir_if_not_exists, sliding_window
+from asn.utils.comm import get_git_commit_hash, create_dir_if_not_exists, sliding_window
 from asn.utils.dataset import (DoubleViewPairDataset, ViewPairDataset)
 from asn.utils.log import log, set_log_file
 from asn.utils.sampler import ViewPairSequenceSampler,SkilViewPairSequenceSampler
 from torchvision import transforms
 import sklearn
 from sklearn import preprocessing
-from scipy.spatial import distance
 
 
 
 
 def _uulmMAD_file_names(vid_file_comm,frame_idx=None,vid_len=None,csv_file=None,state_lable=None):
-    '''return task label for  uulmdata '''
+    '''return task label for  uulm dataset '''
     head, tail = os.path.split(vid_file_comm)
     act = tail.split("_")[1].upper()
     assert act in ["ED1", "ED2", "ED3", "SP1", "SP2", "SP3", "SP4", "SP5",
@@ -50,23 +49,12 @@ def vid_name_to_task(dataset):
     return {"cstack":_combi_file_push_stack_color_names,
             "uulm":_uulmMAD_file_names}[dataset]
 
-def init_log_tb(save_folder):
-    log.setLevel(logging.INFO)
-    set_log_file(os.path.join(save_folder, "train.log"))
 
-    log.info("torchtcn commit hash: {}".format(
-        get_git_commit_hash(asn.__file__)))
-    tb_log_dir = os.path.join(
-        os.path.expanduser(save_folder), "tensorboard_log")
-    writer = SummaryWriter(tb_log_dir)
-    # start_tb_task(tb_log_dir)
-    return writer
-
-def multi_vid_batch_loss(criterion_metric, batch, targets, n_views ,num_vid_example, img_debug=None, save_folder=None):
-    ''' mutlitple vid in bathc, metric loss for mutil example for frame ,only 2 view support'''
+def multi_vid_batch_loss(criterion_metric, batch, targets, num_vid_example):
+    ''' mutlitple task examples in batch, metric loss for mutil example for frame ,only 2 view support'''
     batch_size=batch.size(0)
     emb_view0,emb_view1=batch[:batch_size//2],batch[batch_size//2:]
-    t_view0,t_view1=targets[:batch_size//2],targets[batch_size//2:]
+    t_view0, t_view1=targets[:batch_size//2],targets[batch_size//2:]
     batch_example_vid=emb_view0.size(0)//num_vid_example
     slid_vid = lambda x :sliding_window(x,winSize=batch_example_vid, step=batch_example_vid)
     loss = torch.zeros(1).cuda()
@@ -74,13 +62,6 @@ def multi_vid_batch_loss(criterion_metric, batch, targets, n_views ,num_vid_exam
     # compute loss for each video
     for emb_view0_vid, emb_view1_vid,t0,t1 in zip(slid_vid(emb_view0),slid_vid(emb_view1),slid_vid(t_view0),slid_vid(t_view1)):
         loss+=criterion_metric(torch.cat((emb_view0_vid, emb_view1_vid)),torch.cat((t0, t1)))
-    if img_debug is not None:
-        v0,v1=img_debug[:batch_size//2],img_debug[batch_size//2:]
-        create_dir_if_not_exists(os.path.join(save_folder,"images/"))
-        join_log_path = lambda x: os.path.join(save_folder,"images",x)
-        for view_i, (v,b) in enumerate(zip(slid_vid(v0),slid_vid(v1))):
-            f_name=join_log_path("multi_exampe_input_{}.png".format(view_i))
-            save_image(torch.cat((v,b)),f_name)
     return loss
 
 
@@ -127,7 +108,7 @@ def val_fit_task_lable(vid_name_to_task, all_view_pair_names):
     return transform_comm_name, num_classes,name_classes
 
 
-def get_dataloader_train(dir_vids, num_views, batch_size, use_cuda, img_size=299, filter_func=None, lable_funcs=None,examples_per_seq=None):
+def get_dataloader_train(dir_vids, num_views, batch_size, use_cuda, img_size=299, filter_func=None, lable_funcs=None,examples_per_seq=None,num_workers=1):
     transformer_train = get_train_transformer(img_size)
     sampler = None
     shuffle = True
@@ -178,7 +159,7 @@ def get_dataloader_val(dir_vids, num_views, batch_size, use_cuda, filter_func=No
     return dataloader_val
 
 def get_skill_dataloader(dir_vids, num_views, batch_size,use_cuda,img_size,filter_func,
-        lable_funcs,num_domain_frames=1,stride=1):
+        lable_funcs,num_domain_frames=1,stride=1,num_workers=1):
     # sampler with all rand frames from alle task
     transformer_train =get_train_transformer(img_size = img_size)
    # sample differt view
@@ -208,7 +189,7 @@ def get_skill_dataloader(dir_vids, num_views, batch_size,use_cuda,img_size,filte
                                          drop_last=drop_last,
                                          batch_size=batch_size,
                                          shuffle=True if sampler is None else False,
-                                         num_workers=4,
+                                         num_workers=num_workers,
                                          sampler=sampler,
                                          pin_memory=use_cuda)
 
@@ -216,82 +197,5 @@ def get_skill_dataloader(dir_vids, num_views, batch_size,use_cuda,img_size,filte
         log.warn("dataset sampler batch size")
     return dataloader_train_domain
 
-
-
-def save_image_input(img,sample_batched,key_views,save_folder):
-    # same modle input images
-    create_dir_if_not_exists(os.path.join(save_folder,"images/"))
-    join_log_path = lambda x: os.path.join(save_folder,"images",x)
-    for view_i, k in enumerate(key_views):
-        f_name=join_log_path("tcn_view{}.png".format(view_i))
-        save_image(sample_batched[k],f_name)
-    save_image(img, join_log_path("batch_input.png"))
-
-def get_metric_info(anchor_emb,positive_emb):
-    info_metric={}
-    # distance to positiv example
-    info_metric['dist pos'] = np.linalg.norm(
-        anchor_emb - positive_emb, axis=1).mean()
-    dots, cosin_neg_dist_pos = [],[]
-    for e1, e2 in zip(anchor_emb, positive_emb):
-        dots.append(np.dot(e1-e1.mean(), e2-e2.mean()))
-        cosin_neg_dist_pos.append(-distance.cosine(e1,e2)) # Histogram and Binomial Deviance losses,
-    info_metric['dist pos dot'] = np.mean(dots) # mean free dot pro
-    info_metric['dist pos cos'] = np.mean(cosin_neg_dist_pos)
-
-    n = anchor_emb.shape[0]
-    emb_pos = anchor_emb
-    emb_neg = positive_emb
-    cnt, d_neg, dots_neg,cosin_neg_dist_neg = 0., 0., 0.,0.
-    # TODO rm this loop
-    for i in range(n):
-        for j in range(n):
-            if j != i:
-                d_negative = np.linalg.norm(
-                    emb_pos[i] - emb_neg[j])
-                d_neg += d_negative
-                dots_neg += np.dot(emb_pos[i]-emb_pos[i].mean(),
-                                   emb_neg[j]-emb_neg[j].mean())
-                cosin_neg_dist_neg+=-distance.cosine(emb_pos[i], emb_neg[j])
-
-                cnt += 1
-    info_metric['dist neg'] = d_neg / cnt
-    info_metric['dist neg dot']  = dots_neg / cnt
-    info_metric['dist neg cos'] = cosin_neg_dist_neg/cnt
-    return info_metric
-
-def get_metric_info_multi_example(anchor_emb,positive_emb):
-    ''' get seperate info for each vid in batch '''
-    batch_example_vid=anchor_emb.shape[0]
-    slid_vid = lambda x :sliding_window(x,winSize=batch_example_vid, step=batch_example_vid)
-    info = None
-    for a,p in zip(slid_vid(anchor_emb),slid_vid(positive_emb)):
-        mi =get_metric_info(a,p)
-        if info is None:
-            info={k:[v] for k,v in mi.items()}
-        else:
-            for k,v in mi.items():
-                info[k].append(v)
-
-    return {k:np.mean(v) for k,v in info.items()}
-
-def log_train(writer,mi,loss_metric,criterion_metric,global_step):
-        ''' log to tb and pritn log msg '''
-        msg = "steps {}, dist: pos {:.2},neg {:.2},neg cos dist: pos {:.2},cos_neg {:.2}, loss metric:{:.3}".format(
-            global_step, mi['dist pos'], mi["dist neg"], mi['dist pos cos'], mi['dist neg cos'],loss_metric)
-        log.info(msg)
-        # log.info("dot pos: {:.4} dot neg: {:.4}".format(product_pos, product_neg))
-        writer.add_scalar('train/loss' + criterion_metric.__class__.__name__,
-                          loss_metric, global_step)
-        writer.add_scalars('train/distance',
-                           {'positive':  mi['dist pos'],
-                            'negative': mi['dist neg']}, global_step)
-        writer.add_scalars('train/product',
-                           {'positive':  mi['dist pos dot'],
-                            'negative': mi['dist pos dot']}, global_step)
-
-        writer.add_scalars('train/negativ_cosin_dist',
-                           {'positive':  mi['dist pos cos'],
-                            'negative': mi['dist neg cos']}, global_step)
 
 
