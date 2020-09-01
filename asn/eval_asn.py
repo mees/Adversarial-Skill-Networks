@@ -20,6 +20,8 @@ from asn.utils.log import log
 from asn.utils.train_utils import get_dataloader_val, vid_name_to_task
 from asn.val.alignment import view_pair_alignment_loss
 from asn.val.embedding_visualization import visualize_embeddings
+import torch.multiprocessing as mp
+from torch.multiprocessing import set_start_method
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -35,7 +37,7 @@ def get_args():
 
 
 if __name__ == '__main__':
-
+    set_start_method('spawn')
     args = get_args()
     log.info("args: {}".format(args))
     use_cuda = torch.cuda.is_available()
@@ -61,7 +63,7 @@ if __name__ == '__main__':
         if use_cuda:
             frame_batch = frame_batch.cuda()
         emb = asn.forward(frame_batch)
-        return emb # .data.cpu().numpy()
+        return emb.data.cpu().numpy()
 
     asn.eval()
     with torch.no_grad():

@@ -78,7 +78,7 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
         assert stride is not None
         # cut off first frames
         data_len -= seq_len*stride * len(data_loader.dataset.video_paths)
-    embeddings = torch.empty((data_len, emb_size))
+    embeddings = np.empty((data_len, emb_size))
     img_size = 50  # image size to plot
     frames = torch.empty((data_len, 3, img_size, img_size))
     # trans form the image to plot it later
@@ -104,7 +104,7 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
                 # for e, name, view, last in zip(emb, data["common name"], data["view"].numpy(), data['is last frame'].numpy()):
                 # transform all frames to a smaler image to plt laster
                 for e, frame in zip(emb, frames_batch):
-                    embeddings[cnt_data] = e.cpu().detach()
+                    embeddings[cnt_data] = e
                     # transform only for on img possilbe
                     frames[cnt_data] = trans(frame).cpu()
                     cnt_data += 1
@@ -127,67 +127,6 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
                 view_pair_name_labels.extend(comm_name)
                 if data_len == cnt_data:
                     break
-            else:
-                for i, (frame, name, view, last) in enumerate(zip(frames_batch, data["common name"], data["view"].numpy(), data['is last frame'].numpy())):
-                    if name not in view_pair_emb_seq:
-                        # empty lists for each view
-                        # note: with [[]] * n_views the reference is same
-                        view_pair_emb_seq[name] = {"frame": [[] for _ in range(n_views)],
-                                                   "common name": [],
-                                                   "frame index": [],
-                                                   "video len": [],
-                                                   "state lable": [],
-                                                   "done": [False] * n_views}
-                    view_pair_emb_seq[name]["frame"][view].append(
-                        frame.view(1, *frame.size()))
-                    view_pair_emb_seq[name]["common name"].append(name)
-                    view_pair_emb_seq[name]["frame index"].append(data['frame index'][i].numpy())
-                    view_pair_emb_seq[name]["video len"].append(data['video len'][i].numpy())
-
-                    state_lable = data.get('state lable', None)
-                    if state_lable is not None:
-                        state_lable = state_lable[i]
-                    view_pair_emb_seq[name]["state lable"].append(state_lable)
-                    view_pair_emb_seq[name]["done"][view] = last
-
-                    # compute embeds if all frames
-                    if last:
-
-                        # loop over all seq as batch
-                        n = len(view_pair_emb_seq[name]["frame"][view])
-                        frame_batch = torch.cat(
-                            view_pair_emb_seq[name]["frame"][view])
-                        for i, batch_seq in enumerate(sliding_window(frame_batch, seq_len, step=1, stride=stride, drop_last=True)):
-                            if len(batch_seq) == seq_len:
-                                index_data = i+seq_len*stride
-                                if index_data >= len(view_pair_emb_seq[name]["common name"]):
-                                    # log.error('drop frame expexted longer vid: index {} size vid {}'.format(
-                                        # index_data, frame_batch.size()))
-                                    continue
-                                emb = func_model_forward(batch_seq).cpu().detach()
-                                assert len(emb) == 1
-                                frame = batch_seq[-1]  # last frame from seq in plt
-                                frames[cnt_data] = trans(frame).cpu()
-                                embeddings[cnt_data] = emb.cpu().detach()
-                                cnt_data += 1
-
-                                # add labels
-                                comm_name = view_pair_emb_seq[name]['common name'][index_data]
-                                frame_idx = view_pair_emb_seq[name]['frame index'][index_data]
-                                state_lable = view_pair_emb_seq[name]['state lable'][index_data]
-                                vid_len = view_pair_emb_seq[name]['video len'][index_data]
-                                labels_frame_idx.append(np.asscalar(frame_idx))
-                                vid_len_frame_idx.append(np.asscalar(vid_len))
-                                if lable_func is not None:
-                                    state_lable = lable_func(comm_name, state_lable, frame_idx)
-                                labels.append(state_lable)
-
-                                view_pair_name_labels.append(comm_name)
-                            else:
-                                log.warn("seq len to small")
-                    if all(view_pair_emb_seq[name]["done"]):
-                        view_pair_emb_name = view_pair_emb_seq.pop(name, None)
-                        del view_pair_emb_name
 
             pbar.update(1)
 
@@ -208,7 +147,6 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
         log.info('start TSNE fit')
         labels = labels[:data_len]
         metadata = [[s]for s in labels]
-        embeddings = embeddings.numpy()
         imgs = flip_imgs(frames.numpy(), rgb_to_front=False)
         s_time = time.time()
         rnn_tag = "_seq{}_stride{}".format(seq_len, stride)if seq_len is not None else ""

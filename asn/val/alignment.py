@@ -107,13 +107,11 @@ def get_vid_aligment_loss_pair(embeddings,fill_frame_diff=True):
         ''' embeddings(dict), key common view name and values list view embs for each video view'''
         k=1
         loss, nn_dist, dist_view_pairs = [], [], []
-        # compute the nn for all permutations
-        # TODO   permutations better but combinations used in TF tImplementation
+        # compute the nn for all combi for all views
         for comm_name, view_pair_task_emb in embeddings.items():
             for emb1, emb2 in itertools.combinations(view_pair_task_emb, 2):
                 if fill_frame_diff:
                     # fill frame diff with the last embeddings
-                    # similar to the tf implementation
                     max_diff = len(emb1) - len(emb2)
                     size_embedding = emb1.shape[1]
                     if max_diff > 0:
@@ -156,7 +154,7 @@ def _aligment_loss_process_loop(queue_data, queue_results,fill_frame_diff=True):
         embeddings= queue_data.get()
         results=get_vid_aligment_loss_pair(embeddings)
         queue_results.put(results)
-    log.info("_aligment_loss_process_loop END")
+    log.debug("_aligment_loss_process_loop END")
 
 
 def get_embeddings(func_model_forward, data_loader, n_views, func_view_pair_emb_done=None, seq_len=None, stride=None):
