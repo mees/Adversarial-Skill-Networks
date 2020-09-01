@@ -232,25 +232,16 @@ def define_model(pretrained=True, **kwargs):
 
 def create_model(use_cuda, load_model_file=None, **kwargs):
     asn = define_model(use_cuda, **kwargs)
-    start_epoch, start_step = 0, 0
-    optimizer_state_dict = None
     training_args = None
     if load_model_file:
         load_model_file = os.path.expanduser(load_model_file)
         assert os.path.isfile(
             load_model_file), "file not found {}".format(load_model_file)
         checkpoint = torch.load(load_model_file)
-        start_epoch = checkpoint.get('epoch', 0)
-        start_step = checkpoint.get('step', 0)
         training_args = checkpoint.get('training_args', None)
-        optimizer_state_dict = checkpoint['optimizer_state_dict']
         asn.load_state_dict(checkpoint['model_state_dict'])
-        log.info("Restoring Model from: {}, epoch {}, step {}, datetime {}".format(
-            load_model_file, start_epoch, start_step, checkpoint.get('datetime')))
 
-    if use_cuda:
-        asn = asn.cuda()
-    return asn, start_epoch, start_step, optimizer_state_dict, training_args
+    return asn
 
 
 def save_model(model, save_folder, epoch):

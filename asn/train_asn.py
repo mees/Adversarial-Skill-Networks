@@ -124,7 +124,7 @@ class ASN(pl.LightningModule):
         log.info(get_git_commit_hash(asn.__file__))
         self.hparams = hparams
         self.criterion = {"lifted": LiftedStruct(), "liftedcombi": LiftedCombined()}[self.hparams.loss]
-        self.asn_model, self.start_epoch, self.global_step, _, _ = create_model(
+        self.asn_model = create_model(
              self.hparams.load_model)
         self.in_channels = 32  # out embedding size
         # Discriminator network with iputs outputs depending on the args settings
