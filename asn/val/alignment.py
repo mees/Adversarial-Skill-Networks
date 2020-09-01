@@ -198,34 +198,7 @@ def get_embeddings(func_model_forward, data_loader, n_views, func_view_pair_emb_
                     if func_view_pair_emb_done is not None:
                         func_view_pair_emb_done(emb_dict)
         else:
-            # get all frames for vid
-            for frame, name, view, last in zip(frames_batch, data["common name"], data["view"].numpy(), data['is last frame'].numpy()):
-                if name not in view_pair_emb:
-                    # empty lists for each view
-                    # note: with [[]] * n_views the reference is same
-                    view_pair_emb[name] = {"frame": [[] for _ in range(n_views)],
-                                           "embs": [[] for _ in range(n_views)],
-                                           "done": [False] * n_views}
-                view_pair_emb[name]["frame"][view].append(frame.view(1, *frame.size()))
-                view_pair_emb[name]["done"][view] = last
-
-                # compute embeds if all frames
-                if last:
-                    # loop over all seq as batch
-                    n = len(view_pair_emb[name]["frame"][view])
-                    frame_batch = torch.cat(view_pair_emb[name]["frame"][view])
-                    for i, batch_seq in enumerate(sliding_window(frame_batch, seq_len, step=1, stride=stride, drop_last=True)):
-                        if len(batch_seq) == seq_len:
-                            emb = func_model_forward(batch_seq)
-                            assert len(emb) == 1
-                            view_pair_emb[name]["embs"][view].append(emb[0])
-                if all(view_pair_emb[name]["done"]):
-                    num_view_paris += 1
-                    view_pair_emb_name = view_pair_emb.pop(name, None)
-                    emb_dict = {name: [np.array(e)
-                                       for e in view_pair_emb_name["embs"]]}
-                    if func_view_pair_emb_done is not None:
-                        func_view_pair_emb_done(emb_dict)
+            raise NotImplementedError()
 
     return num_view_paris, num_total_frames
 

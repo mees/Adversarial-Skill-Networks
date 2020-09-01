@@ -57,12 +57,11 @@ def get_args():
     return parser.parse_args()
 
 
-def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
+def visualize_embeddings(func_model_forward, data_loader,
                          global_step=0, seq_len=None, stride=None, lable_func=None, save_dir=None, tag="",emb_size=32):
     """ visualize embeddings with tensorboardX
 
     Args:
-        summary_writer(tensorbsoardX.SummaryWriter):
         data_loader(ViewPairDataset): with shuffle false
         lable_func: function to labe a frame: input is (vid_file_comm,frame_idx=None,vid_len=None,csv_file=None,state_lable=None)
     Returns:
@@ -127,6 +126,8 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
                 view_pair_name_labels.extend(comm_name)
                 if data_len == cnt_data:
                     break
+            else:
+                raise NotImplementedError()
 
             pbar.update(1)
 
@@ -136,11 +137,6 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
         log.warn('number of labels {} smaller than embeddings, chaning embeddings size'.format(len(labels)))
         embeddings = embeddings[:len(labels)]
         frames = frames[:len(labels)]
-    if summary_writer is not None:
-        summary_writer.add_embedding(embeddings,  # expext torch tensor
-                                     label_img=frames,
-                                     global_step=global_step,
-                                     metadata=labels)
     if len(labels) == 0:
         labels = None
     else:
@@ -410,7 +406,7 @@ def main():
         args.vid_dir, args.num_views, args.batch_size, use_cuda,
         filter_func=filter_func)
 
-    visualize_embeddings(model_forward, dataloader, summary_writer=None,
+    visualize_embeddings(model_forward, dataloader,
                          global_step=global_step, tag="", lable_func=lable_func,
                          seq_len=args.seq_len, stride=args.stride)
 
