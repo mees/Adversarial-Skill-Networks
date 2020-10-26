@@ -52,7 +52,8 @@ python train_asn.py --train-dir /tmp/real_combi_task3/videos/train/ --val-dir-me
 
 
 
-## Evaluation
+## Pretrained Model	
+We provide the weights, a log file and a t-SNE visualization for a pretrained model for the default setting [here](asn/pretrained_model.zip). This model achieves an alignment loss of 0.1662 on the unseen color stacking task, which is very close to the 0.165 reported on the paper.
 
 
 

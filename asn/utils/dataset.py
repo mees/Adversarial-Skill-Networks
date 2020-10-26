@@ -306,7 +306,7 @@ class DoubleViewPairDataset(Dataset):
                     [view_pair_index, frame_index])
 
 class ViewPairDataset(Dataset):
-    """multi view pair video dataset.
+    """ multi view pair video dataset.
         dataset with mulitple views pairs video synced in time
         frames are provided was separately
     """

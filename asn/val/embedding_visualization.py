@@ -54,8 +54,8 @@ def get_args():
     return parser.parse_args()
 
 
-def visualize_embeddings(func_model_forward, data_loader, summary_writer,
-                         global_step, seq_len=None, stride=None, lable_func=None, save_dir=None, tag="",emb_size=32):
+def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
+                         global_step=0, seq_len=None, stride=None, lable_func=None, save_dir=None, tag="",emb_size=32):
     """ visualize embeddings with tensorboardX
 
     Args:

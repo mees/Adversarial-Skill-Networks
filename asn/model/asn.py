@@ -39,7 +39,7 @@ class Dense(nn.Module):
     def forward(self, x):
         x = self.linear(x)
         if self.activation is not None:
-            x = self.activation(x, inplace=True)
+            x = self.activation(x)
         return x
 
 class SpatialSoftmax(nn.Module):
@@ -91,7 +91,6 @@ class SpatialSoftmax(nn.Module):
 
 class EncoderModel(nn.Module):
     """Embedder V1. based on TCN
-
     InceptionV3 (mixed_5d) -> conv layers -> spatial softmax ->
         fully connected -> optional l2 normalize -> embedding.
     """
@@ -103,13 +102,10 @@ class EncoderModel(nn.Module):
                  dp_ratio_pretrained_act=0.2,
                  dp_ratio_conv=1.,
                  dp_ratio_fc=0.2,
-                 rnn_type=None,
-                 mode_gaussian_dist=False,
                  latent_z_dim=512,
                  l2_normalize_output=False,
                  finetune_inception=False):
         super().__init__()
-        self.gaussian_mode=mode_gaussian_dist
         self.embedding_size=embedding_size
         log.info('finetune_inception: {}'.format(finetune_inception))
         if not finetune_inception:
@@ -158,21 +154,8 @@ class EncoderModel(nn.Module):
                 self.FullyConnected7n.append(nn.Dropout(p=dp_ratio_fc))
             in_channels = num_hidden
 
-        if self.gaussian_mode:
-            self.FullyConnected7n.append(Dense(in_channels, 512,activation=F.relu))
-            self.l_mu=Dense(512, latent_z_dim)
-            self.l_var=Dense(512, latent_z_dim)
-            # out layer for sampeld lat var
-            self.lat_sampled_out_emb = nn.ModuleList(
-                [Dense(latent_z_dim, 512,activation=F.relu),
-                 nn.Dropout(p=0.2),
-                 Dense(512, 512,activation=F.relu),
-                 nn.Dropout(p=0.2),
-                 Dense(512, embedding_size)
-                 ])
-            self._sequential_z_out = nn.Sequential(*self.lat_sampled_out_emb)
-        else:
-            self.FullyConnected7n.append(Dense(in_channels, embedding_size))
+
+        self.FullyConnected7n.append(Dense(in_channels, embedding_size))
 
         self._all_sequential_feature = nn.Sequential(*self.inception_end_point_mixed_5d,
                                                      *self.Conv2d_6n_3x3,
@@ -182,25 +165,16 @@ class EncoderModel(nn.Module):
         self.l2_normalize_output = l2_normalize_output
         # use l2 norm with triplet loss
         if l2_normalize_output:
-            log.info("TCN with l2 norm out")
+            log.info("model with l2 norm out")
 
-    def forward(self, x, hidden=None, only_feat=False):
-
+    def forward(self, x):
         feature = self._all_sequential_feature(x)
-        kl_loss=None
-        x = None
-        if not only_feat:
-            x = self._all_sequential_emb(feature)
-            if self.gaussian_mode:
-                mu,logvar= self.l_mu(x),self.l_var(x)
-                z = reparameterize(mu, logvar)
-                x = self._sequential_z_out(z)
-                kl_loss=kl_loss_func(mu,logvar)
-
+        y = self._all_sequential_emb(feature)
         if self.l2_normalize_output:
-            return feature, self.normalize(x), kl_loss
+            return self.normalize(y)
         else:
-            return feature, x, kl_loss
+            return y
+
 
     def normalize(self, x):
         return F.normalize(x, p=2, dim=1)

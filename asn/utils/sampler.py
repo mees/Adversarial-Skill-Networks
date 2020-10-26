@@ -76,7 +76,7 @@ class ViewPairSequenceSampler(Sampler):
         return self._num_samples
 
 
-class RNNViewPairSequenceSampler(Sampler):
+class SkilViewPairSequenceSampler(Sampler):
     '''sampler to use with the DoubleViewPairDataset to
         sample n sequences form each view pair
     '''
@@ -171,51 +171,3 @@ class RNNViewPairSequenceSampler(Sampler):
                 assert prev_i_test + self._stride == frame_index_test, "error wrong frame"
             prev_i_test = frame_index_test
 
-class StartEndSequenceSampler(Sampler):
-    ''' sampel state and end state of a task vid
-    '''
-
-    def __init__(self, dataset, margin_start=5, margin_end=5):
-        '''
-
-        '''
-        self.dataset = dataset
-        if not isinstance(dataset, DoubleViewPairDataset):
-            raise ValueError("unsupported dataset: {}".format(dataset.__class__.__name__))
-        # main_source_len = len(self.main_source)
-        #
-        # how_many = int(round(main_source_len / len(self.indices)))
-        # self.to_iter_from = []
-        # for _ in range(how_many):
-        #     self.to_iter_from.extend(self.indices)
-        # Take a number of sequences for the batch.
-        self._margin_start = margin_start
-        self._margin_end = margin_end
-        # start end end state for each vid
-        self._num_samples = self.dataset.get_number_view_pairs() * 2
-        min_len_vid = min(min(l) for l in self.dataset.frame_lengths)
-        # check if vids long enough to smaple wihout replace with margins
-        assert min_len_vid > margin_start+margin_end+2, 'min vid to small for margin'
-
-    def __iter__(self):
-        ''' sample random start and end states for mulitple vids'''
-        np.random.seed()
-        n = self.dataset.get_number_view_pairs()
-        idx = []
-        for view_pair_index in shuffle(range(n)):
-            num_frames = min(self.dataset.frame_lengths[view_pair_index])
-            # smaple frames random fames in start and end range
-            idx_start = np.random.choice(range(self._margin_start))
-            idx_end = np.random.choice(range(num_frames-self._margin_end-1,num_frames))
-            sample_index_start = self.dataset.idx_lookup[view_pair_index][idx_start]
-            sample_index_end = self.dataset.idx_lookup[view_pair_index][idx_end]
-            vid_idx = shuffle([sample_index_start,sample_index_end])
-            idx.extend(vid_idx)
-        return iter(idx)
-
-    def __len__(self):
-        return self._num_samples
-
-    def get_start_end_lable(self, batch_frames_idx):
-        lable_start_end=(batch_frames_idx<=self._margin_start).long()
-        return lable_start_end
