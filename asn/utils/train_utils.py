@@ -6,29 +6,22 @@ import time
 
 import numpy as np
 
-import argparse
 import torch
 import torch.nn as nn
 import asn
 from tensorboardX import SummaryWriter
-from torch import multiprocessing, optim
 from torchvision.utils import save_image
 from torch.autograd import Variable
-from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from asn.loss.metric_learning import LiftedStruct, LiftedCombined
 from asn.utils.comm import get_git_commit_hash, create_dir_if_not_exists, sliding_window
 from asn.utils.dataset import (DoubleViewPairDataset, ViewPairDataset)
 from asn.utils.log import log, set_log_file
 from torchvision import transforms
-import sklearn
 from sklearn import preprocessing
 from scipy.spatial import distance
-from asn.utils.sampler import ViewPairSequenceSampler
-from asn.utils.sampler import SkilViewPairSequenceSampler
+from asn.utils.sampler import ViewPairSequenceSampler, SkilViewPairSequenceSampler
 IMAGE_SIZE = (299, 299)
-
-
 
 
 def combi_push_stack_color_to_task(vid_file_comm,frame_idx=None,vid_len=None,csv_file=None,state_lable=None):
@@ -115,7 +108,7 @@ def get_val_transformer(img_size=299):
     return transformer_val
 
 def val_fit_task_lable(vid_name_to_task, all_view_pair_names):
-    ''' returns func to encode a single file name to labes, for the task'''
+    ''' returns func to encode a single video file name to labes '''
     all_view_pair_names = [vid_name_to_task(f) for f in all_view_pair_names]
     comm_name_to_lable = preprocessing.LabelEncoder()
     comm_name_to_lable.fit(all_view_pair_names)
@@ -237,14 +230,6 @@ def multi_vid_batch_loss(criterion_metric, batch, targets, num_vid_example):
         loss+=criterion_metric(torch.cat((emb_view0_vid, emb_view1_vid)),torch.cat((t0, t1)))
     return loss
 
-def save_image_input(img,sample_batched,key_views,save_folder):
-    # same modle input images
-    create_dir_if_not_exists(os.path.join(save_folder,"images/"))
-    join_log_path = lambda x: os.path.join(save_folder,"images",x)
-    for view_i, k in enumerate(key_views):
-        f_name=join_log_path("tcn_view{}.png".format(view_i))
-        save_image(sample_batched[k],f_name)
-    save_image(img, join_log_path("batch_input.png"))
 
 def get_metric_info(anchor_emb,positive_emb):
     info_metric={}

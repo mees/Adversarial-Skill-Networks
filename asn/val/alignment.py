@@ -102,8 +102,6 @@ def get_all_knn_indexes(task_embeddings, multi_vid_embeddings_to_compare, k=1):
 
     return knn_img_indexes
 
-
-
 def get_vid_aligment_loss_pair(embeddings,fill_frame_diff=True):
     ''' embeddings(dict), key common view name and values list view embs for each video view'''
     k=1
