@@ -3,9 +3,7 @@
 import datetime
 import os
 import shutil
-
 import numpy as np
-
 import torch
 from torch import nn
 from torch.autograd import Function, Variable
@@ -15,21 +13,19 @@ from asn.utils.log import log
 from torchvision import models
 
 
-class BatchNormConv2d(nn.Module):
+class BNConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super().__init__()
         self.conv2d = nn.Conv2d(in_channels, out_channels, **kwargs)
-        # self.batch_norm = nn.BatchNorm2d(out_channels, eps=1e-3)
-        log.info("batch norm disabled")
-        # self.conv2d.apply(weights_init_xavier)
+        self.batch_norm = nn.BatchNorm2d(out_channels, eps=1e-3)
 
     def forward(self, x):
         x = self.conv2d(x)
-        # x = self.batch_norm(x)
+        x = self.batch_norm(x)
         return F.relu(x, inplace=True)
 
 
-class Flatten(nn.Module):
+class Flatt(nn.Module):
     def forward(self, input):
         return input.view(input.size(0), -1)
 
@@ -46,19 +42,6 @@ class Dense(nn.Module):
             x = self.activation(x, inplace=True)
         return x
 
-
-class EmbeddingNet(nn.Module):
-    def normalize(self, x):
-        # Normalize output such that output lives on unit sphere.
-        # buffer = torch.pow(x, 2)
-        # normp = torch.sum(buffer, 1).add_(1e-10)
-        # normalization_constant = torch.sqrt(normp)
-        # output = torch.div(x, normalization_constant.view(-1, 1).expand_as(x))
-        # return output
-        # L2n
-        return F.normalize(x, p=2, dim=1)
-
-
 class SpatialSoftmax(nn.Module):
     '''
         This is a form of spatial attention over the activations.
@@ -69,9 +52,8 @@ class SpatialSoftmax(nn.Module):
         feature.shape height, width,
     '''
 
-    def __init__(self, height, width, channel, temperature=None, data_format='NCHW'):
+    def __init__(self, height, width, channel, temperature=None):
         super().__init__()
-        self.data_format = data_format
         self.height = height
         self.width = width
         self.channel = channel
@@ -94,11 +76,7 @@ class SpatialSoftmax(nn.Module):
     def forward(self, feature):
                 # Output:
         #   (N, C*2) x_0 y_0 ...
-        if self.data_format == 'NHWC':
-            feature = feature.transpose(1, 3).tranpose(
-                2, 3).view(-1, self.height * self.width)
-        else:
-            feature = feature.view(-1, self.height * self.width)
+        feature = feature.view(-1, self.height * self.width)
 
         softmax_attention = F.softmax(feature / self.temperature, dim=-1)
         expected_x = torch.sum(Variable(self.pos_x) *
@@ -111,12 +89,8 @@ class SpatialSoftmax(nn.Module):
         return feature_keypoints
 
 
-
-
-
-
-class TCNModel(EmbeddingNet):
-    """TCN Embedder V1.
+class EncoderModel(nn.Module):
+    """Embedder V1. based on TCN
 
     InceptionV3 (mixed_5d) -> conv layers -> spatial softmax ->
         fully connected -> optional l2 normalize -> embedding.
@@ -132,7 +106,6 @@ class TCNModel(EmbeddingNet):
                  rnn_type=None,
                  mode_gaussian_dist=False,
                  latent_z_dim=512,
-                 rnn_forward_seqarade=False,
                  l2_normalize_output=False,
                  finetune_inception=False):
         super().__init__()
@@ -166,7 +139,7 @@ class TCNModel(EmbeddingNet):
             self.Conv2d_6n_3x3.append(nn.Dropout(p=dp_ratio_pretrained_act))
         # padding=1 so like in the tf =SAME
         for i, out_channels in enumerate(additional_conv_sizes):
-            self.Conv2d_6n_3x3.append(BatchNormConv2d(in_channels, out_channels,
+            self.Conv2d_6n_3x3.append(BNConv2d(in_channels, out_channels,
                                                       padding=1, kernel_size=3, stride=1))
             if dp_ratio_conv < 1.:
                 self.Conv2d_6n_3x3.append(nn.Dropout(p=dp_ratio_conv))
@@ -175,7 +148,7 @@ class TCNModel(EmbeddingNet):
         # Take the spatial soft arg-max of the last convolutional layer.
         self.SpatialSoftmax = SpatialSoftmax(
             channel=512, height=35, width=35)  # nn.Softmax2d()
-        self.FullyConnected7n = nn.ModuleList([Flatten()])
+        self.FullyConnected7n = nn.ModuleList([Flatt()])
         in_channels = 1024  # out of SpatialSoftmax
 
         self.num_freatures=int(in_channels)
@@ -195,7 +168,7 @@ class TCNModel(EmbeddingNet):
                  nn.Dropout(p=0.2),
                  Dense(512, 512,activation=F.relu),
                  nn.Dropout(p=0.2),
-                 Dense(512,embedding_size)
+                 Dense(512, embedding_size)
                  ])
             self._sequential_z_out = nn.Sequential(*self.lat_sampled_out_emb)
         else:
@@ -229,6 +202,10 @@ class TCNModel(EmbeddingNet):
         else:
             return feature, x, kl_loss
 
+    def normalize(self, x):
+        return F.normalize(x, p=2, dim=1)
+
+
 def reparameterize(mu, logvar):
     std = torch.exp(0.5*logvar)
     eps = torch.randn_like(std)
@@ -248,12 +225,12 @@ def kl_loss_func(mu, logvar):
 
 
 def define_model(pretrained=True, **kwargs):
-    return TCNModel(models.inception_v3(pretrained=pretrained), **kwargs)
+    return EncoderModel(models.inception_v3(pretrained=pretrained), **kwargs)
 
 
 def create_model(use_cuda, load_model_file=None, **kwargs):
     asn = define_model(use_cuda, **kwargs)
-    start_epoch, start_step = 0, 0
+    start_step = 0
     optimizer_state_dict = None
     training_args = None
     if load_model_file:
@@ -261,26 +238,24 @@ def create_model(use_cuda, load_model_file=None, **kwargs):
         assert os.path.isfile(
             load_model_file), "file not found {}".format(load_model_file)
         checkpoint = torch.load(load_model_file)
-        start_epoch = checkpoint.get('epoch', 0)
         start_step = checkpoint.get('step', 0)
         training_args = checkpoint.get('training_args', None)
         optimizer_state_dict = checkpoint['optimizer_state_dict']
         asn.load_state_dict(checkpoint['model_state_dict'])
-        log.info("Restoring Model from: {}, epoch {}, step {}, datetime {}".format(
-            load_model_file, start_epoch, start_step, checkpoint.get('datetime')))
+        log.info("Restoring Model from: {}, step {}, datetime {}".format(
+            load_model_file, start_step, checkpoint.get('datetime')))
 
 
     if use_cuda:
         asn = asn.cuda()
-    return asn, start_epoch, start_step, optimizer_state_dict, training_args
+    return asn, start_step, optimizer_state_dict, training_args
 
 
-def save_model(model, optimizer, training_args, is_best, model_folder, epoch, step):
+def save_model(model, optimizer, training_args, is_best, model_folder, step):
     ''' '''
 
     state = {
         'datetime': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        'epoch': epoch,
         'step': step,
         'training_args': training_args,
         'model_state_dict': model.state_dict(),
@@ -295,8 +270,8 @@ def save_model(model, optimizer, training_args, is_best, model_folder, epoch, st
 
     checkpoint = torch.load(filename)
 
-    log.info("Saved Model from: {}, epoch {}, step {}".format(
-        filename, epoch, step))
+    log.info("Saved Model from: {}, step {}".format(
+        filename, step))
     if is_best:
         filename_copy = os.path.join(model_folder, 'model_best.pth.tar')
         shutil.copyfile(filename, filename_copy)

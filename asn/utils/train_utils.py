@@ -18,54 +18,23 @@ from torch.utils.data import DataLoader
 from asn.loss.metric_learning import LiftedStruct, TripletLoss
 from asn.loss.metric_learning import NpairLoss as NPairLoss
 from asn.loss.metric_learning import LiftedCombined
-from asn.utils.comm import distance, get_git_commit_hash, create_dir_if_not_exists, sliding_window
+from asn.utils.comm import get_git_commit_hash, create_dir_if_not_exists, sliding_window
 from asn.utils.dataset import (DoubleViewPairDataset, ViewPairDataset)
 from asn.utils.log import log, set_log_file
-from asn.utils.sampler import ViewPairSequenceSampler
 from torchvision import transforms
 from torchvision.utils import save_image
 from torch.backends import cudnn
 import sklearn
 from sklearn import preprocessing
 from scipy.spatial import distance
-
-IMAGE_SIZE = (299, 299) #inception_v3
+from asn.utils.sampler import ViewPairSequenceSampler
+from asn.utils.sampler import RNNViewPairSequenceSampler
+IMAGE_SIZE = (299, 299)
 
 
 # For fast training
 cudnn.benchmark = True
 
-
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--start-epoch', type=int, default=1)
-    parser.add_argument('--epochs', type=int, default=15000)
-    parser.add_argument('--save-folder', type=str,
-                        default='~/tcn_traind/asn/')
-    parser.add_argument('--load-model', type=str, required=False)
-    parser.add_argument('--train-dir', type=str, default='~/data/train/')
-    parser.add_argument('--val-dir',
-                        type=str, default='~/tcn_data/val')
-    parser.add_argument('--batch-size', type=int, default=32)
-    parser.add_argument('--train-filter-tasks',
-            help="task names to filter for trainig data, fromat, taskx,taskb. videos with the file name will be filtered", type=str, default=None)
-    parser.add_argument('--lr-start', type=float, default=0.0001)
-    parser.add_argument('--num-views', type=int, default=2)
-    parser.add_argument('--num-example-batch',help="num exmaple per batch each video pair, only lifted loss support", type=int, default=1)
-    parser.add_argument('--loss', type=str, default="lifted", help="metric loss triplet,lifted,npair,liftedcombi")
-
-    return parser.parse_args()
-
-class GradReverse(torch.autograd.Function):
-    def forward(self, x):
-        return x.view_as(x)
-
-    def backward(self, grad_output):
-        return (grad_output * -.6)
-
-
-def grad_reverse(x):
-    return GradReverse()(x)
 
 def combi_push_stack_color_to_task(vid_file_comm,frame_idx=None,vid_len=None,csv_file=None,state_lable=None):
     ''' return task label for  push stadck color '''
@@ -76,6 +45,14 @@ def combi_push_stack_color_to_task(vid_file_comm,frame_idx=None,vid_len=None,csv
             # return task +"_fake" if "fake"in tail else task
             return task
     raise ValueError("task not fount {}".format(tail))
+
+def uulmMAD_file_name_to_task(vid_file_comm,frame_idx=None,vid_len=None,csv_file=None,state_lable=None):
+    '''return task label for  uulmdata '''
+    head, tail = os.path.split(vid_file_comm)
+    act = tail.split("_")[1].upper()
+    assert act in ["ED1", "ED2", "ED3", "SP1", "SP2", "SP3", "SP4", "SP5",
+                   "SP6", "SP7", "ST1", "ST2", "ST3", "ST4"], "act not found {}".format(act)
+    return act
 
 def _fit_task_label(vid_name_to_task, all_view_pair_names):
     ''' returns func to encode a single file name to labes, for the task'''
@@ -95,8 +72,7 @@ def _fit_task_label(vid_name_to_task, all_view_pair_names):
 def get_train_transformer(img_size=IMAGE_SIZE[0]):
     transformer_train = transforms.Compose([
         transforms.ToPILImage(),
-         # transforms.Resize(img_size),  #  original tcn with center crop (pouring), user for pybullet data
-	transforms.CenterCrop(img_size),  # TODO original tcn with center crop(pouring)
+	transforms.CenterCrop(img_size),
         # transforms.RandomResizedCrop(IMAGE_SIZE[0], scale=(0.9, 1.0)), # for real data
         transforms.RandomHorizontalFlip(),
         transforms.ColorJitter(brightness=0.3,
@@ -104,15 +80,26 @@ def get_train_transformer(img_size=IMAGE_SIZE[0]):
 #                               hue=0.03,# use for real block data
                                saturation=0.3),
         transforms.ToTensor(),
+        # normalize https://pytorch.org/docs/master/torchvision/models.html
+        transforms.Normalize([0.485, 0.456, 0.406],
+                            [0.229, 0.224, 0.225])
     ])
     return transformer_train
 
+def get_val_transformer(img_size=IMAGE_SIZE[0]):
+    transformer_val = transforms.Compose([
+        transforms.ToPILImage(),  # expects rgb, moves channel to front
+        transforms.CenterCrop(img_size),
+        transforms.ToTensor(),  # imgae 0-255 to 0. - 1.0
+        transforms.Normalize([0.485, 0.456, 0.406],
+                            [0.229, 0.224, 0.225])
+    ])
+    return transformer_val
 
 def get_dataloader_train(dir_vids, num_views, batch_size, criterion, use_cuda, img_size=IMAGE_SIZE[0], filter_func=None, lable_funcs=None,examples_per_seq=None):
     transformer_train = get_train_transformer(img_size)
     sampler = None
     shuffle = True
-    test_normalize_transformer()
     if examples_per_seq is None:
         # sample one vid per batch used for lifted loss
         # used for default tcn for lifted and npair loss
@@ -137,7 +124,7 @@ def get_dataloader_train(dir_vids, num_views, batch_size, criterion, use_cuda, i
                                           examples_per_sequence=examples_per_batch,
                                           # similar_frame_margin=3,# TODO
                                           batch_size=batch_size)
-    
+
     dataloader_train = DataLoader(transformed_dataset_train, drop_last=True,
                                   batch_size=batch_size,
                                   shuffle=shuffle,
@@ -147,22 +134,43 @@ def get_dataloader_train(dir_vids, num_views, batch_size, criterion, use_cuda, i
 
     return dataloader_train
 
-def test_normalize_transformer():
-    ''' test if boths val and test transformer contain norm or not '''
-    contrain_norm= lambda x: any((isinstance(t,transforms.Normalize) for t in x.transforms))
-    assert contrain_norm(get_val_transformer())==contrain_norm(get_train_transformer()), "transforms not same for training and val"
+def get_domain_dataloader_train(dir_vids, num_views, batch_size, criterion,use_cuda,filter_func,lable_funcs,num_domain_frames=1,stride=1):
+    # sampler with all rand frames from alle task
+    transformer_train =get_train_transformer()
+   # sample differt view
+    transformed_dataset_train_domain = DoubleViewPairDataset(vid_dir=dir_vids,
+                                                                 number_views=num_views,
+                                                                 # std_similar_frame_margin_distribution=sim_frames,
+                                                                 transform_frames=transformer_train,
+                                                                 lable_funcs=lable_funcs,
+                                                                 filter_func=filter_func)
 
-def get_val_transformer(img_size=IMAGE_SIZE[0]):
-    transformer_val = transforms.Compose([
-        transforms.ToPILImage(),  # expects rgb, moves channel to front
-	 # transforms.Resize(img_size),
-       transforms.CenterCrop(img_size),  # TODO original tcn with center crop
-        transforms.ToTensor(),  # imgae 0-255 to 0. - 1.0
-        # normalize https://pytorch.org/docs/master/torchvision/models.html
-#        transforms.Normalize([0.485, 0.456, 0.406],
-#                             [0.229, 0.224, 0.225])
-    ])
-    return transformer_val
+    sampler=None
+    drop_last=True
+    log.info('transformed_dataset_train_domain len: {}'.format(len(transformed_dataset_train_domain)))
+    if num_domain_frames >1:
+        assert batch_size % num_domain_frames == 0,'wrong batch size for multi frames '
+        sampler = RNNViewPairSequenceSampler(dataset=transformed_dataset_train_domain,
+                                             stride=stride,
+                                             allow_same_frames_in_seq=True,
+                                             sequence_length=num_domain_frames,
+                                             sequences_per_vid_in_batch=1,
+                                             batch_size=batch_size)
+        log.info('use multi frame dir {} len sampler: {}'.format(dir_vids,len(sampler)))
+        drop_last=len(sampler)>=batch_size
+
+     # random smaple vid
+    dataloader_train_domain = DataLoader(transformed_dataset_train_domain,
+                                         drop_last=drop_last,
+                                         batch_size=batch_size,
+                                         shuffle=True if sampler is None else False,
+                                         num_workers=4,
+                                         sampler=sampler,
+                                         pin_memory=use_cuda)
+
+    if sampler is not None and len(sampler)<=batch_size:
+        log.warn("dataset sampler batch size")
+    return dataloader_train_domain
 
 def init_log_tb(save_folder):
     log.setLevel(logging.INFO)
@@ -178,10 +186,12 @@ def init_log_tb(save_folder):
 
 def get_dataloader_val(dir_vids, num_views, batch_size, use_cuda, filter_func=None, img_size=IMAGE_SIZE[0]):
     transformer_val = get_val_transformer(img_size)
+
     dataset_val = ViewPairDataset(vid_dir=dir_vids,
                                   number_views=num_views,
                                   filter_func=filter_func,
                                   transform_frames=transformer_val)
+
     dataloader_val = DataLoader(dataset_val,
                                 batch_size=batch_size,  # * 2,
                                 shuffle=False,
@@ -191,8 +201,8 @@ def get_dataloader_val(dir_vids, num_views, batch_size, use_cuda, filter_func=No
     return dataloader_val
 
 
-def multi_vid_batch_loss(criterion_metric, batch, targets, n_views ,num_vid_example, img_debug=None, save_folder=None):
-    ''' mutlitple vid in bathc, metric loss for mutil example for frame ,only 2 view support'''
+def multi_vid_batch_loss(criterion_metric, batch, targets, num_vid_example):
+    ''' mutlitple view-pair in batch, metric loss for mutil example for frame , only 2 view support'''
     batch_size=batch.size(0)
     emb_view0,emb_view1=batch[:batch_size//2],batch[batch_size//2:]
     t_view0,t_view1=targets[:batch_size//2],targets[batch_size//2:]
@@ -203,13 +213,6 @@ def multi_vid_batch_loss(criterion_metric, batch, targets, n_views ,num_vid_exam
     # compute loss for each video
     for emb_view0_vid, emb_view1_vid,t0,t1 in zip(slid_vid(emb_view0),slid_vid(emb_view1),slid_vid(t_view0),slid_vid(t_view1)):
         loss+=criterion_metric(torch.cat((emb_view0_vid, emb_view1_vid)),torch.cat((t0, t1)))
-    if img_debug is not None:
-        v0,v1=img_debug[:batch_size//2],img_debug[batch_size//2:]
-        create_dir_if_not_exists(os.path.join(save_folder,"images/"))
-        join_log_path = lambda x: os.path.join(save_folder,"images",x)
-        for view_i, (v,b) in enumerate(zip(slid_vid(v0),slid_vid(v1))):
-            f_name=join_log_path("multi_exampe_input_{}.png".format(view_i))
-            save_image(torch.cat((v,b)),f_name)
     return loss
 
 def save_image_input(img,sample_batched,key_views,save_folder):
@@ -269,16 +272,15 @@ def get_metric_info_multi_example(anchor_emb,positive_emb,num_vid_example):
 
     return {k:np.mean(v) for k,v in info.items()}
 
-def log_train(writer,mi,loss_metric,criterion_metric,global_step,fps,examples_per_seq):
+def log_train(writer, mi, loss_metric, criterion_metric, entropy, global_step):
         ''' log to tb and pritn log msg '''
 
-        msg = "steps {}, dist: pos {:.2},neg {:.2},neg cos dist: pos {:.2},cos_neg {:.2}, loss metric:{:.3}, fps {:.4}".format(
-            global_step, mi['dist pos'], mi["dist neg"], mi['dist pos cos'], mi['dist neg cos'],loss_metric, fps)
+        msg = "steps {}, dist: pos {:.2},neg {:.2},neg cos dist: pos {:.2},cos_neg {:.2}, loss metric:{:.3}".format(
+            global_step, mi['dist pos'], mi["dist neg"], mi['dist pos cos'], mi['dist neg cos'],loss_metric)
         log.info(msg)
         # log.info("dot pos: {:.4} dot neg: {:.4}".format(product_pos, product_neg))
         writer.add_scalar('train/loss' + criterion_metric.__class__.__name__,
                           loss_metric, global_step)
-        writer.add_scalar('train/fps', fps, global_step)
         writer.add_scalars('train/distane',
                            {'positive':  mi['dist pos'],
                             'negative': mi['dist neg']}, global_step)
@@ -290,4 +292,5 @@ def log_train(writer,mi,loss_metric,criterion_metric,global_step,fps,examples_pe
                            {'positive':  mi['dist pos cos'],
                             'negative': mi['dist neg cos']}, global_step)
 
-
+        writer.add_scalar('train/loss_entro',
+                          entropy, global_step)
