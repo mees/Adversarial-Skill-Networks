@@ -17,7 +17,7 @@ class LiftedStruct(nn.Module):
     ''' Lifted Structured Feature Embedding
 
     https://arxiv.org/abs/1511.06452
-    form: https://github.com/vadimkantorov/metriclearningbench
+    based on: https://github.com/vadimkantorov/metriclearningbench
     see also: https://gist.github.com/bkj/565c5e145786cfd362cffdbd8c089cf4
     '''
 
@@ -39,9 +39,9 @@ class LiftedStruct(nn.Module):
         return loss
 
 
-class LiftedStructPosMin(nn.Module):
+class Margin(nn.Module):
     '''
-        min pos distance untill in margin
+        same pair margin
     '''
 
     def forward(self, embeddings, labels, margin=1.0, eps=1e-4):
@@ -49,8 +49,6 @@ class LiftedStructPosMin(nn.Module):
         if torch.cuda.is_available():
             loss = loss.cuda()
         loss = torch.autograd.Variable(loss)
-        # L_{ij} = \log (\sum_{i, k} exp\{m - D_{ik}\} + \sum_{j, l} exp\{m - D_{jl}\}) + D_{ij}
-        # L = \frac{1}{2|P|}\sum_{(i,j)\in P} \max(0, J_{i,j})^2
         d = _pdist(embeddings, squared=False, eps=eps)
         # pos mat  1 wehre labes are same for distane mat
         pos = torch.eq(*[labels.unsqueeze(dim).expand_as(d)
@@ -64,13 +62,13 @@ class LiftedStructPosMin(nn.Module):
                                                  # pos_i.t()).log() + d)).pow(2)) / (neg.sum() - len(d))
         pos_dist_mean=torch.sum(pos_i)/ (neg.sum() - len(d))
         loss+=pos_dist_mean
-        # print('pos_dist_mean: {}'.format(pos_dist_mean))
+
         return loss
 
 class LiftedCombined(nn.Module):
     def __init__(self):
         super().__init__()
-        self.a=LiftedStructPosMin()
+        self.a=Margin()
         self.b=LiftedStruct()
 
     def forward(self, embeddings, labels, margin=1.0, eps=1e-4):

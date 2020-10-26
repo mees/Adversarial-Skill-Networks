@@ -58,6 +58,7 @@ def model_forward(frame_batch, mdl, use_cuda, to_numpy=True):
         return emb.data.cpu().numpy()
     else:
         return emb
+
 def main():
     args = get_args()
     log.info("args: {}".format(args))
