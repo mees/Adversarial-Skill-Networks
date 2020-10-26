@@ -50,6 +50,14 @@ def get_args():
     parser.add_argument('--num-example-batch',help="num of frames from different video pairs sampeld for a batch", type=int, default=4)
     return parser.parse_args()
 
+def model_forward(frame_batch, mdl, use_cuda, to_numpy=True):
+    if use_cuda:
+        frame_batch = frame_batch.cuda()
+    emb = mdl.forward(frame_batch)
+    if to_numpy:
+        return emb.data.cpu().numpy()
+    else:
+        return emb
 def main():
     args = get_args()
     log.info("args: {}".format(args))
@@ -63,15 +71,12 @@ def main():
     asn, global_step_start, _, _ = create_model(
         use_cuda, args.load_model, embedding_size = args.emb_dim)
     log.info('asn: {}'.format(asn.__class__.__name__))
-
-    loss_val_min = None
-    loss_val_min_step = 0
+    asn.train()
 
     # load function which maps video file name to task for different datasets
     vid_name_to_task=transform_vid_name_to_task(args.task)
-    filter_func=None
     dataloader_val = get_dataloader_val(args.val_dir_metric,
-                                        args.num_views, args.batch_size,use_cuda,filter_func)
+                                        args.num_views, args.batch_size,use_cuda)
 
     train_filter_func=None
     if args.train_filter_tasks is not None:
@@ -106,6 +111,7 @@ def main():
     net_input = args.emb_dim*num_domain_frames
     d_net = Discriminator(net_input, H=args.d_net_hidden_dim, z_dim=args.d_net_z_dim, d_out = [num_domain_task_classes])
 
+
     # DATA domain
     # filter out fake examples and tasks for D net
     stride=args.multi_domain_frames_stride
@@ -129,22 +135,15 @@ def main():
                                                           num_domain_frames=num_domain_frames,
                                                           stride=stride)
     if use_cuda:
-        # torch.cuda.seed()
+        torch.cuda.seed()
         criterion.cuda()
         asn.cuda()
         d_net.cuda()
 
-    def model_forward(frame_batch, to_numpy=True):
-        if use_cuda:
-            frame_batch = frame_batch.cuda()
-        emb = asn.forward(frame_batch)
-        if to_numpy:
-            return emb.data.cpu().numpy()
-        else:
-            return emb
 
 
-    model_forward_domain=functools.partial(model_forward,to_numpy=False)
+    model_forward_cuda=functools.partial(model_forward,mdl=asn,use_cuda=use_cuda,to_numpy=False)
+    model_forward_np=functools.partial(model_forward,mdl=asn,use_cuda=use_cuda,to_numpy=True)
 
     # define optimizer for encoder (g) and Discriminator (d)
     params_asn = filter(lambda p: p.requires_grad, asn.parameters())
@@ -155,7 +154,9 @@ def main():
     key_views = ["frames views {}".format(i) for i in range(args.num_views)]
     iter_metric = iter(data_loader_cycle(dataloader_train))
     iter_domain = iter(data_loader_cycle(dataloader_train_domain))
-    asn.train()
+    loss_val_min = None
+    loss_val_min_step = 0
+
     for global_step in range(global_step_start, args.steps):
 
         # =======================================================
@@ -164,14 +165,14 @@ def main():
         # metric loss
         img = torch.cat([sample_batched[key_views[0]],
                          sample_batched[key_views[1]]])
-        embeddings = model_forward(Variable(img), False)
+        embeddings = model_forward_cuda(Variable(img))
         n = sample_batched[key_views[0]].size(0)
         anchor_emb, positive_emb = embeddings[:n], embeddings[n:]
         label_positive_pair = np.arange(n)
         labels = Variable(torch.Tensor(np.concatenate([label_positive_pair, label_positive_pair]))).cuda()
 
         # METRIC loss
-        if examples_per_seq ==1:
+        if examples_per_seq == 1:
             loss_metric = criterion(embeddings, labels)
         else:
             loss_metric = multi_vid_batch_loss(criterion, embeddings, labels,
@@ -182,7 +183,7 @@ def main():
 
         img_domain = torch.cat([sample_batched_domain[key_views[0]],
                                  sample_batched_domain[key_views[1]]])
-        emb_asn =model_forward_domain(Variable(img_domain))
+        emb_asn =model_forward_cuda(Variable(img_domain))
 
         if num_domain_frames !=1:
             # multiple frames as skills
@@ -227,7 +228,7 @@ def main():
         kl_loss.backward()
         optimizer_d.step()
 
-        if global_step % 50 == 0 or global_step == 1:
+        if global_step % 100 == 0 or global_step == 1:
             # log training
             loss_metric = loss_g.data.cpu().numpy().item()
             mi=get_metric_info_multi_example(anchor_emb.data.cpu().numpy(),positive_emb.data.cpu().numpy())
@@ -235,16 +236,16 @@ def main():
 
         # =======================================================
         # Validation
-        if global_step % args.val_step == 0 and global_step:
+        if global_step % args.val_step == 0 and global_step > global_step_start:
             log.info("==============================")
             asn.eval()
 
             if  args.plot_tsne and global_step % 20000 == 0:
                 # save a tsne plot
-                visualize_embeddings(model_forward_domain, dataloader_val, summary_writer=None,
+                visualize_embeddings(model_forward_cuda, dataloader_val, summary_writer=None,
                                      global_step=global_step, save_dir=args.save_folder,
                                      lable_func=vid_name_to_task)
-            loss_val, nn_dist, dist_view_pais, frame_distribution_err_cnt = view_pair_alignment_loss(model_forward,
+            loss_val, nn_dist, dist_view_pais, frame_distribution_err_cnt = view_pair_alignment_loss(model_forward_np,
                                                                                               args.num_views,
                                                                                               dataloader_val)
             asn.train()
