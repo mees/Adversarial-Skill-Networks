@@ -129,7 +129,7 @@ def main():
                                                           num_domain_frames=num_domain_frames,
                                                           stride=stride)
     if use_cuda:
-        torch.cuda.seed()
+        # torch.cuda.seed()
         criterion.cuda()
         asn.cuda()
         d_net.cuda()
@@ -156,7 +156,6 @@ def main():
     iter_metric = iter(data_loader_cycle(dataloader_train))
     iter_domain = iter(data_loader_cycle(dataloader_train_domain))
     asn.train()
-
     for global_step in range(global_step_start, args.steps):
 
         # =======================================================
@@ -200,11 +199,9 @@ def main():
         optimizer_d.zero_grad()
 
         #ensure equal usage of fake samples
-        loss_g=loss_metric*0.5
+        loss_g=loss_metric*0.1
 
-        mone = torch.FloatTensor([-1]).cuda()
-        one = torch.FloatTensor([1]).cuda()
-        # max entro
+        # maximize the entropy
         entropy_fake = entropy(d_out_gen)
         entropy_fake.backward(retain_graph=True)
         entorpy_margin =-1. * marginalized_entropy(d_out_gen)
@@ -230,7 +227,6 @@ def main():
         kl_loss.backward()
         optimizer_d.step()
 
-
         if global_step % 50 == 0 or global_step == 1:
             # log training
             loss_metric = loss_g.data.cpu().numpy().item()
@@ -239,7 +235,7 @@ def main():
 
         # =======================================================
         # Validation
-        if global_step % args.val_step == 0:
+        if global_step % args.val_step == 0 and global_step:
             log.info("==============================")
             asn.eval()
 

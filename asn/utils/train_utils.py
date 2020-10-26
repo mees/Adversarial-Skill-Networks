@@ -92,7 +92,6 @@ def get_train_transformer(img_size=299):
     transformer_train = transforms.Compose([
         transforms.ToPILImage(),
 	# transforms.CenterCrop(img_size),
-        # transforms.RandomResizedCrop(IMAGE_SIZE[0], scale=(0.9, 1.0)), # for real data
         transforms.RandomResizedCrop(img_size, scale=(0.9, 1.0)), # for real data
         transforms.RandomHorizontalFlip(),
         transforms.ColorJitter(brightness=0.3,
@@ -100,7 +99,6 @@ def get_train_transformer(img_size=299):
 #                               hue=0.03,# use for real block data
                                saturation=0.3),
         transforms.ToTensor(),
-        # normalize https://pytorch.org/docs/master/torchvision/models.html
         transforms.Normalize([0.485, 0.456, 0.406],
                             [0.229, 0.224, 0.225])
     ])
@@ -109,9 +107,8 @@ def get_train_transformer(img_size=299):
 def get_val_transformer(img_size=299):
     transformer_val = transforms.Compose([
         transforms.ToPILImage(),  # expects rgb, moves channel to front
-        transforms.Resize([img_size,img_size]),
+        transforms.CenterCrop(img_size),
         transforms.ToTensor(),  # imgae 0-255 to 0. - 1.0
-        # normalize https://pytorch.org/docs/master/torchvision/models.html
        transforms.Normalize([0.485, 0.456, 0.406],
                             [0.229, 0.224, 0.225])
     ])

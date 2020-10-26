@@ -27,6 +27,7 @@ def get_distances(emb1, emb2):
 
 
 def get_knn(task_embedding, imgs_embeddings, frame_debug, k=1):
+    ''' k nearest neighbour for two embedding sequences'''
     if not isinstance(task_embedding, np.ndarray):
         task_embedding = np.array(task_embedding)
     if not isinstance(imgs_embeddings, np.ndarray):
@@ -104,52 +105,52 @@ def get_all_knn_indexes(task_embeddings, multi_vid_embeddings_to_compare, k=1):
 
 
 def get_vid_aligment_loss_pair(embeddings,fill_frame_diff=True):
-        ''' embeddings(dict), key common view name and values list view embs for each video view'''
-        k=1
-        loss, nn_dist, dist_view_pairs = [], [], []
-        # compute the nn for all permutations
-        # TODO   permutations better but combinations used in TF tImplementation
-        for comm_name, view_pair_task_emb in embeddings.items():
-            for emb1, emb2 in itertools.combinations(view_pair_task_emb, 2):
-                if fill_frame_diff:
-                    # fill frame diff with the last embeddings
-                    # similar to the tf implementation
-                    max_diff = len(emb1) - len(emb2)
-                    size_embedding = emb1.shape[1]
-                    if max_diff > 0:
-                        emb2 = np.concatenate(
-                            (emb2, np.full((max_diff, size_embedding), emb1[-1])))
-                    elif max_diff < 0:
-                        emb1 = np.concatenate(
-                            (emb1, np.full((-max_diff, size_embedding), emb2[-1])))
-                knn_img_indexes = get_all_knn_indexes(emb1, [emb2], k=k)
-                # get loss assuption view paire
-                n_frames = knn_img_indexes.shape[0]
-                correct_index = np.arange(n_frames)
-                # index for nn with smallest distance
-                index_for_nn = knn_img_indexes[:, 0, 2]
+    ''' embeddings(dict), key common view name and values list view embs for each video view'''
+    k=1
+    loss, nn_dist, dist_view_pairs = [], [], []
+    # compute the nn for all permutations
+    # TODO   permutations better but combinations used in TF tImplementation
+    for comm_name, view_pair_task_emb in embeddings.items():
+        for emb1, emb2 in itertools.combinations(view_pair_task_emb, 2):
+            if fill_frame_diff:
+                # fill frame diff with the last embeddings
+                # similar to the tf implementation
+                max_diff = len(emb1) - len(emb2)
+                size_embedding = emb1.shape[1]
+                if max_diff > 0:
+                    emb2 = np.concatenate(
+                        (emb2, np.full((max_diff, size_embedding), emb1[-1])))
+                elif max_diff < 0:
+                    emb1 = np.concatenate(
+                        (emb1, np.full((-max_diff, size_embedding), emb2[-1])))
+            knn_img_indexes = get_all_knn_indexes(emb1, [emb2], k=k)
+            # get loss assuption view paire
+            n_frames = knn_img_indexes.shape[0]
+            correct_index = np.arange(n_frames)
+            # index for nn with smallest distance
+            index_for_nn = knn_img_indexes[:, 0, 2]
 
-                abs_frame_error=np.abs(correct_index - index_for_nn)
-                loss_comp = np.mean(abs_frame_error/ float(n_frames))
-                loss.append(loss_comp)
-                # historgram eror loss frames index bin count
-                error_hist_cnts=[]
-                for i,abs_err in enumerate(abs_frame_error):
-                    error_hist_cnts.extend([i]*int(abs_err))
-                nn_dist.append(np.mean(knn_img_indexes[:, 0, 1]))
-                # print infos
-                view_pair_lens = "->".join([str(len(e)) for e in [emb1, emb2]])
-                log.info("aligment loss pair {:>30} with {} frames, loss {:>6.5}, mean nn dist {:>6.5}".format(
-                    comm_name, view_pair_lens, loss_comp, np.mean(nn_dist)))
+            abs_frame_error=np.abs(correct_index - index_for_nn)
+            loss_comp = np.mean(abs_frame_error/ float(n_frames))
+            loss.append(loss_comp)
+            # historgram eror loss frames index bin count
+            error_hist_cnts=[]
+            for i,abs_err in enumerate(abs_frame_error):
+                error_hist_cnts.extend([i]*int(abs_err))
+            nn_dist.append(np.mean(knn_img_indexes[:, 0, 1]))
+            # print infos
+            view_pair_lens = "->".join([str(len(e)) for e in [emb1, emb2]])
+            log.info("aligment loss pair {:>30} with {} frames, loss {:>6.5}, mean nn dist {:>6.5}".format(
+                comm_name, view_pair_lens, loss_comp, np.mean(nn_dist)))
 
-            # get the distaneces for all view paris for the same frame
-            for emb1, emb2 in itertools.combinations(view_pair_task_emb, 2):
-                min_frame_len = min(np.shape(emb1)[0], np.shape(emb2)[0])
-                dist_view_i = [get_distances(e1, e2) for e1, e2 in zip(
-                    emb1[:min_frame_len], emb2[:min_frame_len])]
-                dist_view_pairs.append(np.mean(dist_view_i))
-            loss, nn_dist, dist_view_pairs = [np.mean(i) for i in [loss, nn_dist, dist_view_pairs]]
-        return loss, nn_dist, dist_view_pairs, error_hist_cnts
+        # get the distaneces for all view paris for the same frame
+        for emb1, emb2 in itertools.combinations(view_pair_task_emb, 2):
+            min_frame_len = min(np.shape(emb1)[0], np.shape(emb2)[0])
+            dist_view_i = [get_distances(e1, e2) for e1, e2 in zip(
+                emb1[:min_frame_len], emb2[:min_frame_len])]
+            dist_view_pairs.append(np.mean(dist_view_i))
+        loss, nn_dist, dist_view_pairs = [np.mean(i) for i in [loss, nn_dist, dist_view_pairs]]
+    return loss, nn_dist, dist_view_pairs, error_hist_cnts
 
 def _aligment_loss_process_loop(queue_data, queue_results,fill_frame_diff=True):
     while True:
@@ -161,11 +162,11 @@ def _aligment_loss_process_loop(queue_data, queue_results,fill_frame_diff=True):
 
 def get_embeddings(func_model_forward, data_loader, n_views, func_view_pair_emb_done=None, seq_len=None, stride=None):
     """loss for alignment for view pairs, based on knn distance
-
     Args:
         func_view_pair_emb_done(function): function to call if one embedded view pair was
                             computed, {comon_name:embeddings}
         data_loader(ViewPairDataset): with shuffle false
+        use seq_len, stride for a sequences like mfTCN
     Returns:
         The return a nparray with (n_task_fames,k,((k_index_vid,k_distance,k_frame_index)
 
