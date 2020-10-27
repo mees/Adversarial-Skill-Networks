@@ -6,23 +6,20 @@ import shutil
 import numpy as np
 import torch
 from torch import nn
-from torch.autograd import Function, Variable
+from torch.autograd import Variable
 from torch.nn import functional as F
 from torch.nn.parameter import Parameter
-from asn.utils.log import log
 from torchvision import models
+from asn.utils.log import log
 
 
 class BNConv2d(nn.Module):
-# class BatchNormConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super().__init__()
         self.conv2d = nn.Conv2d(in_channels, out_channels, **kwargs)
-        # selfen.batch_norm = nn.BatchNorm2d(out_channels, eps=1e-3)
 
     def forward(self, x):
         x = self.conv2d(x)
-        # x = self.batch_norm(x)
         return F.relu(x, inplace=True)
 
 
@@ -43,15 +40,15 @@ class Dense(nn.Module):
             x = self.activation(x)
         return x
 
+
 class SpatialSoftmax(nn.Module):
-    '''
+    """
         This is a form of spatial attention over the activations.
         See more here: http://arxiv.org/abs/1509.06113
         based on:
         https://gist.github.com/jeasinema/1cba9b40451236ba2cfb507687e08834
-
         feature.shape height, width,
-    '''
+    """
 
     def __init__(self, height, width, channel, temperature=None):
         super().__init__()
@@ -75,7 +72,7 @@ class SpatialSoftmax(nn.Module):
         self.register_buffer('pos_y', pos_y)
 
     def forward(self, feature):
-                # Output:
+        # Output:
         #   (N, C*2) x_0 y_0 ...
         feature = feature.view(-1, self.height * self.width)
 
@@ -91,8 +88,8 @@ class SpatialSoftmax(nn.Module):
 
 
 class EncoderModel(nn.Module):
-    """Embedder V1. based on TCN
-    InceptionV3 (mixed_5d) -> conv layers -> spatial softmax ->
+    """ Embedder V1. based on TCN
+        InceptionV3 (mixed_5d) -> conv layers -> spatial softmax ->
         fully connected -> optional l2 normalize -> embedding.
     """
     def __init__(self, inception,
@@ -109,11 +106,11 @@ class EncoderModel(nn.Module):
                  l2_normalize_output=False,
                  finetune_inception=False):
         super().__init__()
-        self.gaussian_mode=mode_gaussian_dist
-        self.embedding_size=embedding_size
+        self.gaussian_mode = mode_gaussian_dist
+        self.embedding_size = embedding_size
         log.info('finetune_inception: {}'.format(finetune_inception))
         if not finetune_inception:
-            # disable trainingn for inception v3
+            # disable training for inception v3
             for child in inception.children():
                 for param in child.parameters():
                     param.requires_grad = False
@@ -139,7 +136,7 @@ class EncoderModel(nn.Module):
         # padding=1 so like in the tf =SAME
         for i, out_channels in enumerate(additional_conv_sizes):
             self.Conv2d_6n_3x3.append(BNConv2d(in_channels, out_channels,
-                                                      padding=1, kernel_size=3, stride=1))
+                                               padding=1, kernel_size=3, stride=1))
             if dp_ratio_conv < 1.:
                 self.Conv2d_6n_3x3.append(nn.Dropout(p=dp_ratio_conv))
             in_channels = out_channels
@@ -150,24 +147,24 @@ class EncoderModel(nn.Module):
         self.FullyConnected7n = nn.ModuleList([Flatten()])
         in_channels = 1024  # out of SpatialSoftmax
 
-        self.num_freatures=int(in_channels)
+        self.num_freatures = int(in_channels)
         for i, num_hidden in enumerate(fc_hidden_sizes):
-            self.FullyConnected7n.append(Dense(in_channels, num_hidden,activation=F.relu))
+            self.FullyConnected7n.append(Dense(in_channels, num_hidden, activation=F.relu))
             if dp_ratio_fc > 0.:
                 self.FullyConnected7n.append(nn.Dropout(p=dp_ratio_fc))
             in_channels = num_hidden
 
         if self.gaussian_mode:
-            self.FullyConnected7n.append(Dense(in_channels, 512,activation=F.relu))
-            self.l_mu=Dense(512, latent_z_dim)
-            self.l_var=Dense(512, latent_z_dim)
+            self.FullyConnected7n.append(Dense(in_channels, 512, activation=F.relu))
+            self.l_mu = Dense(512, latent_z_dim)
+            self.l_var = Dense(512, latent_z_dim)
             # out layer for sampeld lat var
             self.lat_sampled_out_emb = nn.ModuleList(
-                [Dense(latent_z_dim, 512,activation=F.relu),
+                [Dense(latent_z_dim, 512, activation=F.relu),
                  nn.Dropout(p=0.2),
-                 Dense(512, 512,activation=F.relu),
+                 Dense(512, 512, activation=F.relu),
                  nn.Dropout(p=0.2),
-                 Dense(512,embedding_size)
+                 Dense(512, embedding_size)
                  ])
             self._sequential_z_out = nn.Sequential(*self.lat_sampled_out_emb)
         else:
@@ -183,78 +180,6 @@ class EncoderModel(nn.Module):
         if l2_normalize_output:
             log.info("TCN with l2 norm out")
 
-    # def __init__(self, inception,
-                 # additional_conv_sizes=[512, 512],
-                 # fc_hidden_sizes=[2048],
-                 # embedding_size=32,
-                 # dp_ratio_pretrained_act=0.2,
-                 # dp_ratio_conv=1.,
-                 # dp_ratio_fc=0.2,
-                 # latent_z_dim=512,
-                 # l2_normalize_output=False,
-                 # finetune_inception=False):
-        # super().__init__()
-        # self.embedding_size=embedding_size
-        # log.info('finetune_inception: {}'.format(finetune_inception))
-        # if not finetune_inception:
-            # # disable trainingn for inception v3
-            # for child in inception.children():
-                # for param in child.parameters():
-                    # param.requires_grad = False
-
-        # # see:
-        # # https://github.com/pytorch/vision/blob/master/torchvision/models/inception.py
-        # self.inception_end_point_mixed_5d = nn.ModuleList(
-            # [inception.Conv2d_1a_3x3,
-             # inception.Conv2d_2a_3x3,
-             # inception.Conv2d_2b_3x3,
-             # nn.MaxPool2d(kernel_size=3, stride=2),
-             # inception.Conv2d_3b_1x1,
-             # inception.Conv2d_4a_3x3,
-             # nn.MaxPool2d(kernel_size=3, stride=2),
-             # inception.Mixed_5b,
-             # inception.Mixed_5c,
-             # inception.Mixed_5d])
-
-        # # TCN Conv Layer: Optionally add more conv layers.<
-        # in_channels = 288
-        # self.Conv2d_6n_3x3 = nn.ModuleList()
-        # if dp_ratio_pretrained_act < 1.:
-            # self.Conv2d_6n_3x3.append(nn.Dropout(p=dp_ratio_pretrained_act))
-        # # padding=1 so like in the tf =SAME
-        # for i, out_channels in enumerate(additional_conv_sizes):
-            # self.Conv2d_6n_3x3.append(BNConv2d(in_channels, out_channels,
-                                                      # padding=1, kernel_size=3, stride=1))
-            # if dp_ratio_conv < 1.:
-                # self.Conv2d_6n_3x3.append(nn.Dropout(p=dp_ratio_conv))
-            # in_channels = out_channels
-
-        # # Take the spatial soft arg-max of the last convolutional layer.
-        # self.SpatialSoftmax = SpatialSoftmax(
-            # channel=512, height=35, width=35)  # nn.Softmax2d()
-        # self.FullyConnected7n = nn.ModuleList([Flatt()])
-        # in_channels = 1024  # out of SpatialSoftmax
-
-        # self.num_freatures=int(in_channels)
-        # for i, num_hidden in enumerate(fc_hidden_sizes):
-            # self.FullyConnected7n.append(Dense(in_channels, num_hidden,activation=F.relu))
-            # if dp_ratio_fc > 0.:
-                # self.FullyConnected7n.append(nn.Dropout(p=dp_ratio_fc))
-            # in_channels = num_hidden
-
-
-        # self.FullyConnected7n.append(Dense(in_channels, embedding_size))
-
-        # self._all_sequential_feature = nn.Sequential(*self.inception_end_point_mixed_5d,
-                                                     # *self.Conv2d_6n_3x3,
-                                                     # self.SpatialSoftmax)
-
-        # self._all_sequential_emb = nn.Sequential(*self.FullyConnected7n)
-        # self.l2_normalize_output = l2_normalize_output
-        # # use l2 norm with triplet loss
-        # if l2_normalize_output:
-            # log.info("model with l2 norm out")
-
     def forward(self, x):
         feature = self._all_sequential_feature(x)
         y = self._all_sequential_emb(feature)
@@ -263,15 +188,15 @@ class EncoderModel(nn.Module):
         else:
             return y
 
-
     def normalize(self, x):
         return F.normalize(x, p=2, dim=1)
 
 
 def reparameterize(mu, logvar):
-    std = torch.exp(0.5*logvar)
+    std = torch.exp(0.5 * logvar)
     eps = torch.randn_like(std)
-    return mu + eps*std
+    return mu + eps * std
+
 
 def kl_loss_func(mu, logvar):
     # KL divergence losses summed over all elements and batch
@@ -283,7 +208,6 @@ def kl_loss_func(mu, logvar):
     KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
     return KLD
-
 
 
 def define_model(pretrained=True, **kwargs):
@@ -307,15 +231,12 @@ def create_model(use_cuda, load_model_file=None, **kwargs):
         log.info("Restoring Model from: {}, step {}, datetime {}".format(
             load_model_file, start_step, checkpoint.get('datetime')))
 
-
     if use_cuda:
         asn = asn.cuda()
     return asn, start_step, optimizer_state_dict, training_args
 
 
 def save_model(model, optimizer, training_args, is_best, model_folder, step):
-    ''' '''
-
     state = {
         'datetime': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         'step': step,
@@ -329,7 +250,6 @@ def save_model(model, optimizer, training_args, is_best, model_folder, step):
         os.makedirs(model_folder)
     filename = os.path.join(model_folder, 'model.pth.tar')
     torch.save(state, filename)
-
     checkpoint = torch.load(filename)
 
     log.info("Saved Model from: {}, step {}".format(

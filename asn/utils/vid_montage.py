@@ -1,22 +1,17 @@
 import argparse
-import functools
 import os
-from multiprocessing import Process, Queue
-import numpy as np
-import torch #before cv2
+from multiprocessing import Process
+
 import cv2
+import numpy as np
 import sklearn.utils
-from sklearn.utils import shuffle
 from torch import multiprocessing
-from torch.autograd import Variable
-from asn.model.asn import create_model
-from asn.utils.comm import get_view_pair_vid_files
-from asn.utils.img import (convert_to_uint8, montage, np_shape_to_cv,
-                                resize_with_border)
-from asn.utils.log import log
-from asn.utils.vid_to_np import VideoFrameSampler
 from tqdm import tqdm
 
+from asn.utils.comm import get_view_pair_vid_files
+from asn.utils.img import (convert_to_uint8, montage, np_shape_to_cv)
+from asn.utils.log import log
+from asn.utils.vid_to_np import VideoFrameSampler
 
 '''
 create a grid of vids
@@ -59,9 +54,9 @@ def get_args():
 
 
 def get_frames(input_vid_file, n_process, num_frames, image_size):
-    '''yield n frames from differt viedeos by n processes,
+    """ yield n frames from differt viedeos by n processes,
         runs untill all video frames are sampeled, other frames are black
-    '''
+    """
     print("number of vid files:", len(input_vid_file))
     assert len(input_vid_file) >= n_process
     process_frames = []
@@ -85,7 +80,7 @@ def get_frames(input_vid_file, n_process, num_frames, image_size):
                 sample_fames_vid = 0
             if vid is None:
                 # return empty if no more fames to get
-                frame = np.zeros(image_size+(3,), dtype=dt)
+                frame = np.zeros(image_size + (3,), dtype=dt)
             else:
                 frame = vid.get_frame(sample_fames_vid)
             sample_fames_vid += 1
@@ -111,7 +106,7 @@ def get_frames(input_vid_file, n_process, num_frames, image_size):
 
 
 def get_fourcc(file_name):
-    ''' input file_name or extension '''
+    """ input file_name or extension """
     assert "." in file_name
     if file_name.strip()[0] == ".":
         file_extension_out = file_name
@@ -137,7 +132,7 @@ def main():
     assert os.path.isdir(input_imgs_file), "input not a dir"
     input_imgs_file = get_view_pair_vid_files(n_views, input_imgs_file)
     assert len(input_imgs_file), "no vids found"
-    view_pair_idx=args.view_idx
+    view_pair_idx = args.view_idx
     input_imgs_file = [view_piar_vid[view_pair_idx] for view_piar_vid in input_imgs_file]
     input_imgs_file = sklearn.utils.shuffle(input_imgs_file)
     ex_to_fourcc = {'.mov': 'jpeg', '.mp4': 'MP4V', '.avi': "MJPG"}
@@ -145,9 +140,10 @@ def main():
     log.info("output vid: {}".format(args.output_vid_name))
     fps = args.fps
     vid_writer = None
-    for frames in tqdm(get_frames(input_imgs_file, args.mun_col*args.mun_row, args.num_frames, image_size), desc="frame", total=args.num_frames):
+    for frames in tqdm(get_frames(input_imgs_file, args.mun_col * args.mun_row, args.num_frames, image_size),
+                       desc="frame", total=args.num_frames):
 
-        imgs = [[frames[y] for y in range(x, x+args.mun_row)]
+        imgs = [[frames[y] for y in range(x, x + args.mun_row)]
                 for x in range(0, len(frames), args.mun_row)]
 
         margin = 2
@@ -155,8 +151,8 @@ def main():
                                 margin_color_bgr=[0, 0, 0],
                                 margin_top=margin, margin_bottom=margin,
                                 margin_left=margin, margin_right=margin,
-                                margin_seperat_vertical=margin,
-                                margin_seperat_horizontal=margin)
+                                margin_separate_vertical=margin,
+                                margin_separate_horizontal=margin)
         montage_image = convert_to_uint8(montage_image)
         if vid_writer is None:
             # vid writer if shape isknows after rot

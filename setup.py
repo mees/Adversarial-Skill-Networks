@@ -3,7 +3,6 @@
 """Setup ASN installation."""
 
 import re
-import sys
 from os import path as op
 
 from setuptools import find_packages, setup
@@ -21,7 +20,7 @@ _author = re.search(r'^__author__\s*=\s*"(.*)"', _meta, re.M).group(1)
 _mail = re.search(r'^__email__\s*=\s*"(.*)"', _meta, re.M).group(1)
 
 install_requires = [l for l in _read('requirements.txt').split('\n')
-    if l and not l.startswith('#') and not l.startswith('-')]
+                    if l and not l.startswith('#') and not l.startswith('-')]
 
 meta = dict(
     name=_project,
@@ -30,7 +29,6 @@ meta = dict(
     description='Adversarial Skill Networks implementation in pytorch',
     platforms=('Any'),
     zip_safe=False,
-
 
     keywords='pytorch asn'.split(),
 
@@ -42,7 +40,6 @@ meta = dict(
 
     install_requires=install_requires,
 )
-
 
 if __name__ == "__main__":
     print("find_packag", find_packages(exclude=["tests"]))

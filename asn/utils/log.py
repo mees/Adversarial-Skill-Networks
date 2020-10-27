@@ -36,6 +36,7 @@ datefmt = "%H:%M:%S"
 _mpi_rank_info = ""
 try:
     from mpi4py import MPI
+
     rank = MPI.COMM_WORLD.Get_rank() if MPI.COMM_WORLD.Get_size() > 1 else None
     if rank is not None:
         _mpi_rank_info = "{:<10}".format("MPI np {} ".format(rank))
@@ -47,19 +48,21 @@ log = logging.getLogger()
 try:
     # color log format
     from colorlog import ColoredFormatter
-    _format_color = '%(asctime)s %(log_color)s%(levelname)-7s %(reset) s%(module)-8s {}- %(message)s'.format(_mpi_rank_info)
+
+    _format_color = '%(asctime)s %(log_color)s%(levelname)-7s %(reset) s%(module)-8s {}- %(message)s'.format(
+        _mpi_rank_info)
     colors = {'DEBUG': 'reset',
               'INFO': 'reset',
-                      'WARNING': 'bold_yellow',
-                      'ERROR': 'bold_red',
-                      'CRITICAL': 'bold_red'}
+              'WARNING': 'bold_yellow',
+              'ERROR': 'bold_red',
+              'CRITICAL': 'bold_red'}
 
     # logging.root.setLevel(logging.DEBUG)
     formatter = ColoredFormatter(
         _format_color, log_colors=colors, datefmt=datefmt)
 
 except ImportError:
-    formatter = logging.Formatter(_format,datefmt=datefmt)
+    formatter = logging.Formatter(_format, datefmt=datefmt)
 
 _stdout_handler = logging.StreamHandler()
 _stdout_handler.setFormatter(formatter)
@@ -67,11 +70,12 @@ log.addHandler(_stdout_handler)
 _file_handler = None
 log.setLevel(LOG_LEVEL)
 
+
 def disable_log_prints():
     global _stdout_handler
     if _stdout_handler is not None:
         log.removeHandler(_stdout_handler)
-    _stdout_handler=None
+    _stdout_handler = None
 
 
 @contextmanager
@@ -82,13 +86,14 @@ def suppress_logging():
     try:
         yield
     finally:
-        _stdout_handler=old
+        _stdout_handler = old
         log.addHandler(_stdout_handler)
 
+
 def set_log_file(log_file, mpi_only_log_rank=None):
-    '''
+    """
         mpi_only_rank(int or NOne), mpi rank only to log to the file
-    '''
+    """
     global _file_handler
     # create file handler which logs even debug messages
     # always overte file unless multi mpi log

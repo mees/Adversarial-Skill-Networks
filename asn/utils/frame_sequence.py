@@ -1,20 +1,14 @@
 import argparse
-import functools
 import os
-import numpy as np
-import torch #before cv2
+
 import cv2
+import numpy as np
 import sklearn.utils
-from sklearn.utils import shuffle
-from torch import multiprocessing
-from torch.autograd import Variable
-from asn.model.asn import create_model
+
 from asn.utils.comm import get_view_pair_vid_files
-from asn.utils.img import convert_to_uint8, montage, resize_with_border
+from asn.utils.img import convert_to_uint8, montage
 from asn.utils.log import log
 from asn.utils.vid_to_np import VideoFrameSampler
-
-
 
 
 def get_args():
@@ -39,18 +33,16 @@ def get_args():
 
 
 def show_sequence(imgs, delay=0, n_frame=1, save_name=None, to_rgb=True):
-    '''shows a 2d imgs array like [[img1,img2], with frame counter as
-        titles
-    '''
+    """ shows a 2d imgs array like [[img1,img2], with frame counter as titles """
     if n_frame != 1:
         imgs = [i_v[::n_frame] for i_v in imgs]
     titles = [["frame {}".format(n * n_frame)
                for n in range(len(i))] for i in imgs]
     # take one the longest title row to show on top
     titles = [sorted(titles, key=len, reverse=True)[0]]
-    montage_image = montage(imgs, titels=titles,
-                            margin_seperat_vertical=0,
-                            margin_seperat_horizontal=5)
+    montage_image = montage(imgs, titles=titles,
+                            margin_separate_vertical=0,
+                            margin_separate_horizontal=5)
     montage_image = convert_to_uint8(montage_image)
     if to_rgb:
         montage_image = cv2.cvtColor(montage_image, cv2.COLOR_RGB2BGR)

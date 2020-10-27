@@ -3,11 +3,10 @@ t sne plot with sklearn and tensorboardX
 """
 
 import argparse
-import functools
-import itertools
 import os
-from collections import defaultdict
+
 import matplotlib
+
 # Force matplotlib to not use any Xwindows backend.
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -15,22 +14,12 @@ import numpy as np
 from matplotlib import offsetbox
 import time
 import torch  # before cv2
-import cv2
 from sklearn import preprocessing
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-from sklearn.utils import shuffle
-from torch import multiprocessing
-from torch.autograd import Variable
 from asn.utils.img import flip_imgs
-from asn.utils.comm import get_other_view_files, sliding_window, create_dir_if_not_exists
-from asn.utils.data import AligmentViewPairSampler, get_data_loader
-from asn.utils.dataset import ViewPairDataset,get_video_csv_file
-from asn.utils.frame_sequence import show_sequence
+from asn.utils.comm import sliding_window, create_dir_if_not_exists
+from asn.utils.dataset import ViewPairDataset, get_video_csv_file
 from asn.utils.log import log
-from asn.utils.vid_to_np import VideoFrameSampler
 from torchvision import transforms
-from torchvision.utils import save_image
 from tqdm import tqdm
 from MulticoreTSNE import MulticoreTSNE as TSNE_multi
 from collections import OrderedDict
@@ -45,7 +34,7 @@ def get_args():
                         default=None)
     parser.add_argument('--num-views', type=int, required=False, default=2)
     parser.add_argument('--use-cuda', type=int, required=False, default=1)
-    parser.add_argument('--model-mode', type=str, default='asn',help="tcn asn or lstm")
+    parser.add_argument('--model-mode', type=str, default='asn', help="tcn asn or lstm")
     parser.add_argument('--batch-size', type=int, required=False, default=16)
     parser.add_argument('--seq-len', type=int, default=None,
                         help="len of the sequence, must betbatch-size \% rnn-seq-len ==0 ")
@@ -55,7 +44,7 @@ def get_args():
 
 
 def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
-                         global_step=0, seq_len=None, stride=None, lable_func=None, save_dir=None, tag="",emb_size=32):
+                         global_step=0, seq_len=None, stride=None, lable_func=None, save_dir=None, tag="", emb_size=32):
     """ visualize embeddings with tensorboardX
 
     Args:
@@ -64,6 +53,13 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
         lable_func: function to labe a frame: input is (vid_file_comm,frame_idx=None,vid_len=None,csv_file=None,state_lable=None)
     Returns:
         None
+        :param func_model_forward:
+        :param global_step:
+        :param seq_len:
+        :param stride:
+        :param save_dir:
+        :param tag:
+        :param emb_size:
 
     """
     assert isinstance(data_loader.dataset,
@@ -74,7 +70,7 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
     if seq_len:
         assert stride is not None
         # cut off first frames
-        data_len -= seq_len*stride * len(data_loader.dataset.video_paths)
+        data_len -= seq_len * stride * len(data_loader.dataset.video_paths)
     embeddings = torch.empty((data_len, emb_size))
     img_size = 50  # image size to plot
     frames = torch.empty((data_len, 3, img_size, img_size))
@@ -115,17 +111,18 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
                 vid_len_frame_idx.extend(vid_len.numpy())
                 if lable_func is not None:
                     state_lable = len(
-                        comm_name)*[None] if state_lable is None else state_lable
-                    state_lable = [lable_func(c, i, v_len,get_video_csv_file(vid_dir,c),la)
+                        comm_name) * [None] if state_lable is None else state_lable
+                    state_lable = [lable_func(c, i, v_len, get_video_csv_file(vid_dir, c), la)
                                    for c, la, i, v_len in zip(comm_name, state_lable, frame_idx, vid_len)]
                 else:
-                    state_lable=comm_name
+                    state_lable = comm_name
                 labels.extend(state_lable)
                 view_pair_name_labels.extend(comm_name)
                 if data_len == cnt_data:
                     break
             else:
-                for i, (frame, name, view, last) in enumerate(zip(frames_batch, data["common name"], data["view"].numpy(), data['is last frame'].numpy())):
+                for i, (frame, name, view, last) in enumerate(
+                        zip(frames_batch, data["common name"], data["view"].numpy(), data['is last frame'].numpy())):
                     if name not in view_pair_emb_seq:
                         # empty lists for each view
                         # note: with [[]] * n_views the reference is same
@@ -154,12 +151,13 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
                         n = len(view_pair_emb_seq[name]["frame"][view])
                         frame_batch = torch.cat(
                             view_pair_emb_seq[name]["frame"][view])
-                        for i, batch_seq in enumerate(sliding_window(frame_batch, seq_len, step=1, stride=stride, drop_last=True)):
+                        for i, batch_seq in enumerate(
+                                sliding_window(frame_batch, seq_len, step=1, stride=stride, drop_last=True)):
                             if len(batch_seq) == seq_len:
-                                index_data = i+seq_len*stride
+                                index_data = i + seq_len * stride
                                 if index_data >= len(view_pair_emb_seq[name]["common name"]):
                                     # log.error('drop frame expexted longer vid: index {} size vid {}'.format(
-                                        # index_data, frame_batch.size()))
+                                    # index_data, frame_batch.size()))
                                     continue
                                 emb = func_model_forward(batch_seq).cpu().detach()
                                 assert len(emb) == 1
@@ -204,24 +202,23 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
     else:
         log.info('start TSNE fit')
         labels = labels[:data_len]
-        metadata = [[s]for s in labels]
+        metadata = [[s] for s in labels]
         embeddings = embeddings.numpy()
         imgs = flip_imgs(frames.numpy(), rgb_to_front=False)
         s_time = time.time()
-        rnn_tag = "_seq{}_stride{}".format(seq_len, stride)if seq_len is not None else ""
+        rnn_tag = "_seq{}_stride{}".format(seq_len, stride) if seq_len is not None else ""
         X_tsne = TSNE_multi(n_jobs=4, perplexity=40).fit_transform(
-	    embeddings)  # perplexity = 40, theta=0.5
+            embeddings)  # perplexity = 40, theta=0.5
         # create_time_vid(X_tsne,labels_frame_idx,vid_len_frame_idx)
-        plot_embedding(X_tsne, labels, title=tag+"multi-t-sne_perplexity40_theta0.5_step" +
-              str(global_step)+rnn_tag, imgs=imgs, save_dir=save_dir,
-              frame_lable=labels_frame_idx, max_frame=vid_len_frame_idx,
-              vid_lable=view_pair_name_labels)
+        plot_embedding(X_tsne, labels, title=tag + "multi-t-sne_perplexity40_theta0.5_step" +
+                                             str(global_step) + rnn_tag, imgs=imgs, save_dir=save_dir,
+                       frame_lable=labels_frame_idx, max_frame=vid_len_frame_idx,
+                       vid_lable=view_pair_name_labels)
         # log.info('mulit tsne s_time: {}'.format(time.time()-s_time))
     del embeddings, imgs, labels, X_tsne
 
 
-
-def plt_lables_blow(ax, legend_handels):
+def plt_labels_blow(ax, legend_handels):
     box = ax.get_position()
     ax.set_position([box.x0, box.y0 + box.height * 0.1,
                      box.width, box.height * 0.9])
@@ -231,7 +228,8 @@ def plt_lables_blow(ax, legend_handels):
               fancybox=True, shadow=True, ncol=5)
 
 
-def plt_labled_data(ax, X, labels_str, plt_cm=plt.cm.gist_ncar, lable_filter_legend=None, index_color_factor=None,hide_legend=False):
+def plt_labeled_data(ax, X, labels_str, plt_cm=plt.cm.gist_ncar, lable_filter_legend=None, index_color_factor=None,
+                     hide_legend=False):
     assert X.shape[0] == len(labels_str), "plt X shape {}, string lable len {}".format(
         X.shape[0], len(labels_str))
     le = preprocessing.LabelEncoder()
@@ -240,7 +238,7 @@ def plt_labled_data(ax, X, labels_str, plt_cm=plt.cm.gist_ncar, lable_filter_leg
     n_classes = float(len(metadata_header))
     y = le.transform(labels_str)
     if index_color_factor is None:
-        colors = [plt_cm(y_i / float(n_classes))for y_i in y]
+        colors = [plt_cm(y_i / float(n_classes)) for y_i in y]
         # classes as color sector
     else:
         # color factor for index
@@ -255,8 +253,10 @@ def plt_labled_data(ax, X, labels_str, plt_cm=plt.cm.gist_ncar, lable_filter_leg
     # find ould legend elements if filtered
     filtered_leged = []
 
-    def check_filter(l): return (
-        lable_filter_legend is None or lable_filter_legend(l))
+    def check_filter(l):
+        return (
+                lable_filter_legend is None or lable_filter_legend(l))
+
     for l in metadata_header:
         if check_filter(l) and l not in filtered_leged:
             filtered_leged.append(l)
@@ -264,25 +264,24 @@ def plt_labled_data(ax, X, labels_str, plt_cm=plt.cm.gist_ncar, lable_filter_leg
     # get for each class one (if not filterd) legend handle
     legend_elements = {}
     if not hide_legend:
-       for i in range(X.shape[0]):
-           l = labels_str[i]
-           if l not in legend_elements and check_filter(l):
-               h = ax.scatter(X[i, 0], X[i, 1], color=plt_cm(
-                   y[i] / float(n_classes)), label=l)
-               legend_elements[l] = h
-               if len(legend_elements) == len(filtered_leged):
-               # all handels found
-                   break
-       # sort lables:
-       legend_elements = OrderedDict(sorted(legend_elements.items()))
-       # Shrink current axis's height by 10% on the bottom
-       plt_lables_blow(ax, list(legend_elements.values()))
+        for i in range(X.shape[0]):
+            l = labels_str[i]
+            if l not in legend_elements and check_filter(l):
+                h = ax.scatter(X[i, 0], X[i, 1], color=plt_cm(
+                    y[i] / float(n_classes)), label=l)
+                legend_elements[l] = h
+                if len(legend_elements) == len(filtered_leged):
+                    # all handels found
+                    break
+        # sort lables:
+        legend_elements = OrderedDict(sorted(legend_elements.items()))
+        # Shrink current axis's height by 10% on the bottom
+        plt_labels_blow(ax, list(legend_elements.values()))
 
     return n_classes, y, colors, legend_elements
 
 
 def plot_embedding(X, labels_str, title, imgs=None, save_dir=None, frame_lable=None, max_frame=None, vid_lable=None):
-
     # http://scikit-learn.org/stable/auto_examples/manifold/plot_lle_digits.html
     x_min, x_max = np.min(X, 0), np.max(X, 0)
     X = (X - x_min) / (x_max - x_min)
@@ -293,8 +292,8 @@ def plot_embedding(X, labels_str, title, imgs=None, save_dir=None, frame_lable=N
         fig = plt.figure()
         ax = fig.gca()
 
-    # lablels blow plt
-    n_classes, y, colors, legend_elements = plt_labled_data(ax, X, labels_str)
+    # labels blow plt
+    n_classes, y, colors, legend_elements = plt_labeled_data(ax, X, labels_str)
 
     plt.title(title)
     if imgs is not None:
@@ -318,22 +317,22 @@ def plot_embedding(X, labels_str, title, imgs=None, save_dir=None, frame_lable=N
                 ax.add_artist(imagebox)
 
         # plt legend same as befor
-        plt_lables_blow(ax, list(legend_elements.values()))
+        plt_labels_blow(ax, list(legend_elements.values()))
 
     if frame_lable is not None:
         # plt the frames classe
         # show color for ever 50 frame in legend
         ax = plt.subplot(223)
-        plt_labled_data(ax, X, frame_lable,
-                        lable_filter_legend=lambda l: l % 50 == 0,
-                        plt_cm=plt.cm.Spectral, index_color_factor=max_frame)
+        plt_labeled_data(ax, X, frame_lable,
+                         lable_filter_legend=lambda l: l % 50 == 0,
+                         plt_cm=plt.cm.Spectral, index_color_factor=max_frame)
 
-        ax.set_title("frames as label (color range normalized for ervery vid)")
+        ax.set_title("frames as label (color range normalized for every vid)")
     if vid_lable is not None:
         # plt the view pair as classe
         ax = plt.subplot(224)
-        plt_labled_data(ax, X, vid_lable,
-                        lable_filter_legend=lambda x: False)
+        plt_labeled_data(ax, X, vid_lable,
+                         lable_filter_legend=lambda x: False)
 
         ax.set_title("view pair as label")
 
@@ -341,61 +340,62 @@ def plot_embedding(X, labels_str, title, imgs=None, save_dir=None, frame_lable=N
         create_dir_if_not_exists(save_dir)
         save_dir = os.path.expanduser(save_dir)
         title = os.path.join(save_dir, title)
-    fig.savefig(title+".pdf", bbox_inches='tight')
+    fig.savefig(title + ".pdf", bbox_inches='tight')
     log.info('save TSNE plt to: {}'.format(title))
     plt.close('all')
 
 
-def create_time_vid(X,frame_lable,max_frame, frame_num_step=100,plt_cm=plt.cm.Spectral):
-        frame_steps=np.linspace(0, 1.0, num=frame_num_step)
-	# add some frame of the full plot at the end of the vid
-        # frame_steps=np.append(frame_steps,[1.]*20)
-        frame_idx_norm = np.array([y_i / float(c_n)
-                  for y_i, c_n in zip(frame_lable, max_frame)])
-        print('frame_idx_norm: {}'.format(frame_idx_norm.shape))
-        vid_name= "test.mp4"
-        fps=10
-        x_min, x_max = np.min(X, 0), np.max(X, 0)
-        X = (X - x_min) / (x_max - x_min)
-        xmin,xmax=np.min(X[:, 0]),np.max(X[:, 0])
-        ymin,ymax=np.min(X[:, 1]),np.max(X[:, 1])
-        vid_writer=None
-        for f in frame_steps:
-            fig=plt.figure(figsize=(5,5),facecolor=(0, 0, 0))
-            # set tight margin
-            left = 0.05
-            bottom = 0.05
-            width = 0.95
-            height = 0.95
-            ax = fig.add_axes([left, bottom, width, height])
-            tmp_img="/tmp/plt_{}.png".format(f)
-            # selcect vid frames with norm vid len
-            dig_idx = frame_idx_norm<=f
-            X_dig = X[dig_idx]
-            frame_lable_dig = np.array(frame_lable)[dig_idx]
-            max_frame_dig = np.array(max_frame)[dig_idx]
-            plt_labled_data(ax, X_dig, frame_lable_dig,
-                # lable_filter_legend=lambda l: l % 50 == 0,
-                   plt_cm=plt_cm,
-                   index_color_factor=max_frame_dig,hide_legend=True)
-            # same axis for every frames
-            plt.axis('off')
-            off_s=0.02
-            ax.set_xlim([xmin-off_s*(xmax-xmin),xmax+off_s*(xmax-xmin)])
-            ax.set_ylim([ymin-off_s*(ymax-ymin),ymax+off_s*(ymax-ymin)])
-            # plt.savefig(tmp_img,dpi = 200, facecolor=fig.get_facecolor())
-            plt.savefig(tmp_img,dpi = 200)
-            img=cv2.imread(tmp_img)
-            if vid_writer is None:
-                fourcc = get_fourcc(vid_name)
-                # vid writer if shape isknows after rot
-                vid_writer = cv2.VideoWriter(
-                     vid_name, fourcc, fps, (img.shape[1],img.shape[0]))
-            vid_writer.write(img)
-            plt.close('all')
-        for _ in range(20):
-            vid_writer.write(img)
-        vid_writer.release()
+def create_time_vid(X, frame_lable, max_frame, frame_num_step=100, plt_cm=plt.cm.Spectral):
+    frame_steps = np.linspace(0, 1.0, num=frame_num_step)
+    # add some frame of the full plot at the end of the vid
+    # frame_steps=np.append(frame_steps,[1.]*20)
+    frame_idx_norm = np.array([y_i / float(c_n)
+                               for y_i, c_n in zip(frame_lable, max_frame)])
+    print('frame_idx_norm: {}'.format(frame_idx_norm.shape))
+    vid_name = "test.mp4"
+    fps = 10
+    x_min, x_max = np.min(X, 0), np.max(X, 0)
+    X = (X - x_min) / (x_max - x_min)
+    xmin, xmax = np.min(X[:, 0]), np.max(X[:, 0])
+    ymin, ymax = np.min(X[:, 1]), np.max(X[:, 1])
+    vid_writer = None
+    for f in frame_steps:
+        fig = plt.figure(figsize=(5, 5), facecolor=(0, 0, 0))
+        # set tight margin
+        left = 0.05
+        bottom = 0.05
+        width = 0.95
+        height = 0.95
+        ax = fig.add_axes([left, bottom, width, height])
+        tmp_img = "/tmp/plt_{}.png".format(f)
+        # selcect vid frames with norm vid len
+        dig_idx = frame_idx_norm <= f
+        X_dig = X[dig_idx]
+        frame_lable_dig = np.array(frame_lable)[dig_idx]
+        max_frame_dig = np.array(max_frame)[dig_idx]
+        plt_labeled_data(ax, X_dig, frame_lable_dig,
+                         # lable_filter_legend=lambda l: l % 50 == 0,
+                         plt_cm=plt_cm,
+                         index_color_factor=max_frame_dig, hide_legend=True)
+        # same axis for every frames
+        plt.axis('off')
+        off_s = 0.02
+        ax.set_xlim([xmin - off_s * (xmax - xmin), xmax + off_s * (xmax - xmin)])
+        ax.set_ylim([ymin - off_s * (ymax - ymin), ymax + off_s * (ymax - ymin)])
+        # plt.savefig(tmp_img,dpi = 200, facecolor=fig.get_facecolor())
+        plt.savefig(tmp_img, dpi=200)
+        img = cv2.imread(tmp_img)
+        if vid_writer is None:
+            fourcc = get_fourcc(vid_name)
+            # vid writer if shape isknows after rot
+            vid_writer = cv2.VideoWriter(
+                vid_name, fourcc, fps, (img.shape[1], img.shape[0]))
+        vid_writer.write(img)
+        plt.close('all')
+    for _ in range(20):
+        vid_writer.write(img)
+    vid_writer.release()
+
 
 def main():
     args = get_args()
@@ -414,63 +414,16 @@ def main():
                 return emb.data.cpu().numpy()
             else:
                 return emb
-    elif args.model_mode == "tcn":
-        from asn.model.tcn import create_model
-        tcn_model, epoch, global_step, _, _ = create_model(
-            use_cuda, args.model)
 
-        def model_forward(frame_batch):
-            if use_cuda:
-                frame_batch = frame_batch.cuda()
-            return tcn_model.forward(frame_batch)  # normal tcn
-    else:
-        from asn.model.tcn import create_model, RNN
-        rnn_type = RNN.TYPE_GRU
-
-        tcn_model, epoch, global_step, _, _ = create_model(
-            use_cuda, args.model, rnn_type=rnn_type, rnn_forward_seqarade=False)
-
-        def model_forward(frame_batch):
-            ''' input is one seq, return the hidden state at the end of the seq'''
-            if use_cuda:
-                frame_batch = frame_batch.cuda()
-                # feed embeddins
-            assert not tcn_model.rnn_forward_seqarade
-            hidden = None
-            if len(frame_batch) == args.seq_len:
-                # only one seq as batch
-                # use for eval
-                for e in frame_batch:
-                    _, hidden = tcn_model(e.view(1, *e.size()), hidden)
-            else:
-                raise ValueError()
-            if rnn_type == RNN.TYPE_LSTM:
-                ret = hidden[0]  # hidden state
-            else:
-                ret = hidden
-
-            ret = ret.view(len(frame_batch) // args.seq_len,
-                           ret.size(2))  # TODO
-            assert len(ret) != 0
-            # DEBUG:
-            if len(frame_batch) == args.seq_len:
-                # check to work with aligment loss
-                assert len(ret) == 1
-            assert len(ret) == len(frame_batch) // args.seq_len
-            return ret
-
-
-    tcn_model.eval()
-
-    filter_func=None
-    lable_func = None
+    filter_func = None
+    label_func = None
 
     dataloader = get_dataloader_val(
         args.vid_dir, args.num_views, args.batch_size, use_cuda,
         filter_func=filter_func)
 
     visualize_embeddings(model_forward, dataloader, summary_writer=None,
-                         global_step=global_step, tag="", lable_func=lable_func,
+                         global_step=global_step, tag="", lable_func=label_func,
                          seq_len=args.seq_len, stride=args.stride)
 
 

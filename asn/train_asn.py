@@ -3,27 +3,27 @@ import functools
 
 import numpy as np
 import torch
-import torch.nn as nn
-from torch.nn import functional as F
-from tensorboardX import SummaryWriter
 from torch import optim
 from torch.autograd import Variable
-from asn.loss.metric_learning import (LiftedStruct,LiftedCombined)
+from torch.backends import cudnn
+
 from asn.loss.entro import (marginalized_entropy, entropy)
-from asn.utils.comm import create_dir_if_not_exists, data_loader_cycle, create_label_func
-from asn.utils.train_utils import get_metric_info_multi_example, log_train, multi_vid_batch_loss
+from asn.loss.metric_learning import (LiftedStruct, LiftedCombined)
 from asn.model.asn import create_model, save_model
 from asn.model.d_net import Discriminator
-from asn.utils.train_utils import get_dataloader_val, get_dataloader_train, get_skill_dataloader,transform_vid_name_to_task
+from asn.utils.comm import data_loader_cycle
 from asn.utils.log import log
+from asn.utils.train_utils import get_dataloader_val, get_dataloader_train, get_skill_dataloader, \
+    transform_vid_name_to_task
+from asn.utils.train_utils import get_metric_info_multi_example, log_train, multi_vid_batch_loss
 from asn.utils.train_utils import init_log_tb
-from asn.utils.train_utils import combi_push_stack_color_to_task, val_fit_task_lable,uulmMAD_file_name_to_task
+from asn.utils.train_utils import val_fit_task_label
 from asn.val.alignment import view_pair_alignment_loss
 from asn.val.embedding_visualization import visualize_embeddings
-from torch.backends import cudnn
 
 # For fast training
 cudnn.benchmark = True
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -31,24 +31,30 @@ def get_args():
     parser.add_argument('--save-folder', type=str, default='/tmp/asn')
     parser.add_argument('--load-model', type=str, required=False, help='path to model_best.pth.tar file')
     parser.add_argument('--val-step', type=int, default=1000, help='Validation every n step')
-    parser.add_argument('--task', type=str, default="cstack", help='mulitview dataset, for real block data with cstack" or persion action dataset with "uulmMAD")')
+    parser.add_argument('--task', type=str, default="cstack",
+                        help='multiview dataset, for real block data with cstack" or persion action dataset with "uulmMAD")')
     parser.add_argument('--train-dir', type=str, default='~/data/train/')
     parser.add_argument('--val-dir-metric', type=str, default='~/asn_data/val')
     parser.add_argument('--batch-size', type=int, default=16)
-    parser.add_argument('--loss', type=str,help="metric loss lifted or liftedcombi", default="liftedcombi")
+    parser.add_argument('--loss', type=str, help="metric loss lifted or liftedcombi", default="liftedcombi")
     parser.add_argument('--lr-d', type=float, default=0.0001)
     parser.add_argument('--lr-g', type=float, default=0.0001)
-    parser.add_argument('--num-views', type=int, default=2,help='number for campera views in the dataset')
+    parser.add_argument('--num-views', type=int, default=2, help='number for camera views in the dataset')
     parser.add_argument('--plot-tsne', action="store_true", default=False)
-    parser.add_argument('--num-domain-frames', type=int, default=2,help='num of embedded frames defining a skill')
-    parser.add_argument('--emb-dim', type=int, default=32, help='embedding dimention')
-    parser.add_argument('--d-net-hidden-dim', type=int, default=500, help='hidden dimention for the Discriminator network')
-    parser.add_argument('--d-net-z-dim', type=int, default=64, help='z dimention for the Discriminator network')
-    parser.add_argument('--multi-domain-frames-stride', type=int, default=15, help='num of frames between each sampeled frame defining a skil')
+    parser.add_argument('--num-domain-frames', type=int, default=2, help='num of embedded frames defining a skill')
+    parser.add_argument('--emb-dim', type=int, default=32, help='embedding dimension')
+    parser.add_argument('--d-net-hidden-dim', type=int, default=500,
+                        help='hidden dimension for the Discriminator network')
+    parser.add_argument('--d-net-z-dim', type=int, default=64, help='z dimension for the Discriminator network')
+    parser.add_argument('--multi-domain-frames-stride', type=int, default=15,
+                        help='num of frames between each sampled frame defining a skill')
     parser.add_argument('--train-filter-tasks',
-            help="task names to filter for training data, format: 'taskx,taskb' videos with the file name will be filtered", type=str, default=None)
-    parser.add_argument('--num-example-batch',help="num of frames from different video pairs sampeld for a batch", type=int, default=4)
+                        help="task names to filter for training data, format: 'taskx,taskb' videos with the file name will be filtered",
+                        type=str, default=None)
+    parser.add_argument('--num-example-batch', help="num of frames from different video pairs sampled for a batch",
+                        type=int, default=4)
     return parser.parse_args()
+
 
 def model_forward(frame_batch, mdl, use_cuda, to_numpy=True):
     if use_cuda:
@@ -59,92 +65,92 @@ def model_forward(frame_batch, mdl, use_cuda, to_numpy=True):
     else:
         return emb
 
+
 def main():
     args = get_args()
     log.info("args: {}".format(args))
     writer = init_log_tb(args.save_folder)
     use_cuda = torch.cuda.is_available()
     print('use_cuda: {}'.format(use_cuda))
-    criterion = {"lifted":LiftedStruct(),"liftedcombi":LiftedCombined()}[args.loss]
+    criterion = {"lifted": LiftedStruct(), "liftedcombi": LiftedCombined()}[args.loss]
     log.info("criterion: for {} ".format(
         criterion.__class__.__name__))
 
     asn, global_step_start, _, _ = create_model(
-        use_cuda, args.load_model, embedding_size = args.emb_dim)
+        use_cuda, args.load_model, embedding_size=args.emb_dim)
     log.info('asn: {}'.format(asn.__class__.__name__))
     asn.train()
 
     # load function which maps video file name to task for different datasets
-    vid_name_to_task=transform_vid_name_to_task(args.task)
+    vid_name_to_task = transform_vid_name_to_task(args.task)
     dataloader_val = get_dataloader_val(args.val_dir_metric,
-                                        args.num_views, args.batch_size,use_cuda)
+                                        args.num_views, args.batch_size, use_cuda)
 
-    train_filter_func=None
+    train_filter_func = None
     if args.train_filter_tasks is not None:
-        # filter out tasks by namnes for the training set
-        train_filter_tasks= args.train_filter_tasks.split(',')
+        # filter out tasks by names for the training set
+        train_filter_tasks = args.train_filter_tasks.split(',')
         log.info('train_filter_tasks: {}'.format(train_filter_tasks))
+
         def train_filter_func(name, n_frames):
-            return all(task not in name for task in train_filter_tasks)#ABD->C
-    examples_per_seq=args.num_example_batch
+            return all(task not in name for task in train_filter_tasks)  # ABD->C
+    examples_per_seq = args.num_example_batch
     dataloader_train = get_dataloader_train(args.train_dir, args.num_views, args.batch_size,
-                                                    use_cuda,
-                                                    img_size=299,
-                                                    filter_func=train_filter_func,
-                                                    examples_per_seq=examples_per_seq)
+                                            use_cuda,
+                                            img_size=299,
+                                            filter_func=train_filter_func,
+                                            examples_per_seq=examples_per_seq)
 
     all_view_pair_names = dataloader_train.dataset.get_all_comm_view_pair_names()
     all_view_pair_frame_lengths = dataloader_train.dataset.frame_lengths
 
-    # for every task one lable based on video name
+    # for every task one label based on video name
     # not used to train the models
-    transform_comm_name, num_domain_task_classes,task_names=val_fit_task_lable(vid_name_to_task,all_view_pair_names)
+    transform_comm_name, num_domain_task_classes, task_names = val_fit_task_label(vid_name_to_task, all_view_pair_names)
     log.info('task names: {}'.format(task_names))
 
-    # func to transform video name to a task labled
-    lable_funcs={'domain task lable':transform_comm_name}
-    num_domain_frames=args.num_domain_frames
+    # func to transform video name to a task label
+    label_funcs = {'domain task label': transform_comm_name}
+    num_domain_frames = args.num_domain_frames
 
     # embedding class
     log.info('num_domain_frames: {}'.format(num_domain_frames))
 
     # Discriminator network with iputs outputs depending on the args settings
-    net_input = args.emb_dim*num_domain_frames
-    d_net = Discriminator(net_input, H=args.d_net_hidden_dim, z_dim=args.d_net_z_dim, d_out = [num_domain_task_classes])
-
+    net_input = args.emb_dim * num_domain_frames
+    d_net = Discriminator(net_input, H=args.d_net_hidden_dim, z_dim=args.d_net_z_dim, d_out=[num_domain_task_classes])
 
     # DATA domain
     # filter out fake examples and tasks for D net
-    stride=args.multi_domain_frames_stride
+    stride = args.multi_domain_frames_stride
     if args.train_filter_tasks is not None:
-        def filter_func_domain(name,frames_cnt):
-            ' return no fake exmaples for filtered tasks'
+        def filter_func_domain(name, frames_cnt):
+            """ return no fake examples for filtered tasks"""
             return "fake" not in name and all(task not in name for task in train_filter_tasks)
     else:
         filter_func_domain = None
-        def filter_func_domain(name,frames_cnt):
-            ' return no fake exmaples for filtered tasks'
+
+        def filter_func_domain(name, frames_cnt):
+            """ return no fake exmaples for filtered tasks"""
             return "fake" not in name
 
     dataloader_train_domain = get_skill_dataloader(args.train_dir,
-                                                          args.num_views,
-                                                          args.batch_size,
-                                                          use_cuda,
-                                                          img_size=299,
-                                                          filter_func=filter_func_domain,
-                                                          lable_funcs=lable_funcs,
-                                                          num_domain_frames=num_domain_frames,
-                                                          stride=stride)
+                                                   args.num_views,
+                                                   args.batch_size,
+                                                   use_cuda,
+                                                   img_size=299,
+                                                   filter_func=filter_func_domain,
+                                                   label_funcs=label_funcs,
+                                                   num_domain_frames=num_domain_frames,
+                                                   stride=stride)
     if use_cuda:
         torch.cuda.seed()
         criterion.cuda()
         asn.cuda()
         d_net.cuda()
 
-
-
-    model_forward_cuda=functools.partial(model_forward,mdl=asn,use_cuda=use_cuda,to_numpy=False)
-    model_forward_np=functools.partial(model_forward,mdl=asn,use_cuda=use_cuda,to_numpy=True)
+    model_forward_cuda = functools.partial(model_forward, mdl=asn, use_cuda=use_cuda, to_numpy=False)
+    model_forward_np = functools.partial(model_forward, mdl=asn, use_cuda=use_cuda, to_numpy=True)
 
     # define optimizer for encoder (g) and Discriminator (d)
     params_asn = filter(lambda p: p.requires_grad, asn.parameters())
@@ -183,32 +189,32 @@ def main():
         sample_batched_domain = next(iter_domain)
 
         img_domain = torch.cat([sample_batched_domain[key_views[0]],
-                                 sample_batched_domain[key_views[1]]])
-        emb_asn =model_forward_cuda(Variable(img_domain))
+                                sample_batched_domain[key_views[1]]])
+        emb_asn = model_forward_cuda(Variable(img_domain))
 
-        if num_domain_frames !=1:
+        if num_domain_frames != 1:
             # multiple frames as skills
-            bl=emb_asn.size(0)
-            emb_size=emb_asn.size(1)
-            emb_asn=emb_asn.view(bl//num_domain_frames,num_domain_frames*emb_size)
-            # mask out lable for cat view
+            bl = emb_asn.size(0)
+            emb_size = emb_asn.size(1)
+            emb_asn = emb_asn.view(bl // num_domain_frames, num_domain_frames * emb_size)
+            # mask out label for cat view
 
         kl_loss, d_out_gen = d_net(emb_asn)
-        d_out_gen= d_out_gen[0]
+        d_out_gen = d_out_gen[0]
 
-        # min the entro for diffent classes
+        # min the entropy for different classes
         optimizer_g.zero_grad()
         optimizer_d.zero_grad()
 
-        #ensure equal usage of fake samples
-        loss_g=loss_metric*0.1
+        # ensure equal usage of fake samples
+        loss_g = loss_metric * 0.1
 
         # maximize the entropy
         entropy_fake = entropy(d_out_gen)
         entropy_fake.backward(retain_graph=True)
-        entorpy_margin =-1. * marginalized_entropy(d_out_gen)
+        entropy_margin = -1. * marginalized_entropy(d_out_gen)
         # ensure equal usage of fake samples
-        entorpy_margin.backward(retain_graph=True)
+        entropy_margin.backward(retain_graph=True)
 
         # update the encoder network
         loss_g.backward(retain_graph=True)
@@ -221,10 +227,10 @@ def main():
         # update the Discriminator
 
         # maximize marginalized entropy over real samples to ensure equal usage
-        entorpy_margin = -1. * marginalized_entropy(d_out_gen)
-        entorpy_margin.backward(retain_graph=True)
+        entropy_margin = -1. * marginalized_entropy(d_out_gen)
+        entropy_margin.backward(retain_graph=True)
         # minimize entropy to make certain prediction of real sample
-        entropy_real =  -1. * entropy(d_out_gen)
+        entropy_real = -1. * entropy(d_out_gen)
         entropy_real.backward(retain_graph=True)
         kl_loss.backward()
         optimizer_d.step()
@@ -232,7 +238,7 @@ def main():
         if global_step % 100 == 0 or global_step == 1:
             # log training
             loss_metric = loss_g.data.cpu().numpy().item()
-            mi=get_metric_info_multi_example(anchor_emb.data.cpu().numpy(),positive_emb.data.cpu().numpy())
+            mi = get_metric_info_multi_example(anchor_emb.data.cpu().numpy(), positive_emb.data.cpu().numpy())
             log_train(writer, mi, loss_metric, criterion, entropy_fake, global_step)
 
         # =======================================================
@@ -241,14 +247,14 @@ def main():
             log.info("==============================")
             asn.eval()
 
-            if  args.plot_tsne and global_step % 20000 == 0:
+            if args.plot_tsne and global_step % 20000 == 0:
                 # save a tsne plot
                 visualize_embeddings(model_forward_cuda, dataloader_val, summary_writer=None,
                                      global_step=global_step, save_dir=args.save_folder,
                                      lable_func=vid_name_to_task)
             loss_val, nn_dist, dist_view_pais, frame_distribution_err_cnt = view_pair_alignment_loss(model_forward_np,
-                                                                                              args.num_views,
-                                                                                              dataloader_val)
+                                                                                                     args.num_views,
+                                                                                                     dataloader_val)
             asn.train()
 
             writer.add_histogram("val/frame_error_count",
@@ -273,6 +279,7 @@ def main():
                        args.save_folder, global_step)
 
     writer.close()
+
 
 if __name__ == '__main__':
     main()

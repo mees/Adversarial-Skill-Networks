@@ -1,21 +1,18 @@
 import argparse
-import functools
 import os.path
 import timeit
 
-import numpy as np
-
 import cv2
+import numpy as np
 import skvideo.io
 import torch
-from sklearn.utils import shuffle
+
 from asn.utils.img import np_shape_to_cv
 from asn.utils.log import log
-from torchvision.utils import save_image
 
 
-class VideoFrameSampler():
-    ''' optimized if random frames are sampled from a video'''
+class VideoFrameSampler:
+    """ optimized if random frames are sampled from a video"""
 
     def __init__(self, vid_path, resize_shape=None, dtype=np.uint8, to_rgb=True, torch_transformer=None):
         self._vid_path = os.path.expanduser(vid_path)
@@ -33,7 +30,7 @@ class VideoFrameSampler():
             if not to_rgb:
                 log.warn("bgr imag and torch transformer")
         self.dtype = dtype
-       
+
     def _get_vid_info(self, cap_open=None):
         if cap_open is None:
             cap = cv2.VideoCapture(self._vid_path)
@@ -63,13 +60,13 @@ class VideoFrameSampler():
         return self.fps
 
     def count_frames(self):
-        ''' count the frame to get a correct value'''
+        """ count the frame to get a correct value"""
         frame_count = 0
         read_next = True
         cap = cv2.VideoCapture(self._vid_path)
         if self.approximate_frameCount is None:
             self._get_vid_info(cap)
-        while(read_next):
+        while read_next:
             # set frame pos -> has different results without for some vids
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_count)
             # cap.set can lead to an inf loop
@@ -92,12 +89,12 @@ class VideoFrameSampler():
             for i, rgb in enumerate(self):
                 all_frames[i, :, :, :] = rgb
         else:
-            all_frames = torch.zeros((len(self),)+tmp.size(), dtype=tmp.dtype)
+            all_frames = torch.zeros((len(self),) + tmp.size(), dtype=tmp.dtype)
             try:
-                backend =  "ffmpeg" if skvideo._HAS_FFMPEG else "libav"
-                if not self.to_rgb:# convert to bgr not supported here TODO
+                backend = "ffmpeg" if skvideo._HAS_FFMPEG else "libav"
+                if not self.to_rgb:  # convert to bgr not supported here TODO
                     raise ValueError()
-                vid = skvideo.io.vread(self._vid_path,backend=backend)
+                vid = skvideo.io.vread(self._vid_path, backend=backend)
             except ValueError as e:
                 log.warn("skvideo failed, falling back to cv2")
                 vid = self
@@ -125,7 +122,7 @@ class VideoFrameSampler():
             # reduce the trame index to get last frame
             trys = 10
             try_count = 1
-            while(not ok and try_count <= trys):
+            while not ok and try_count <= trys:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index - try_count)
                 ok, bgr = cap.read()
                 try_count += 1
@@ -135,7 +132,8 @@ class VideoFrameSampler():
         cap.release()
         assert bgr is not None, "faild reading frame for video frame {}, header frames {}".format(
             frame_index, self.count_frames())
-        if self.resize_shape is not None and self.frameWidth != self.resize_shape[1] and self.frameHeight != self.resize_shape[0]:
+        if self.resize_shape is not None and self.frameWidth != self.resize_shape[1] and self.frameHeight != \
+                self.resize_shape[0]:
             # cv2 mat size is fliped -> ::-1
             bgr = cv2.resize(bgr, np_shape_to_cv(
                 self.resize_shape), cv2.INTER_NEAREST)
@@ -151,13 +149,14 @@ class VideoFrameSampler():
 
 
 def random_frame_sample_timeit(vid_file):
-    ''' test for time to sample differt random frames'''
+    """ test for time to sample differt random frames"""
     N_frames = 32
 
     def _sample_random_frames():
         v = VideoFrameSampler(vid_file)
         frames_rand = np.random.choice(np.arange(len(v)), size=N_frames)
         return [v.get_frame(i) for i in frames_rand]
+
     print("timeit differt frame sample for: ", vid_file)
     print(timeit.timeit(_sample_random_frames, number=1000))
 
@@ -165,6 +164,7 @@ def random_frame_sample_timeit(vid_file):
         v = skvideo.io.vread(vid_file)
         frames_rand = np.random.choice(np.arange(v.shape[0]), size=N_frames)
         return [v[i] for i in frames_rand]
+
     print("timeit differt frame sk vid for: ", vid_file)
     print(timeit.timeit(_sample_random_frames_skvid, number=1000))
 
@@ -180,8 +180,8 @@ def main():
     random_frame_sample_timeit(args.task_vid)
 
     for rgb in VideoFrameSampler(args.task_vid):
-            # plt.imshow(rgb, interpolation='nearest')
-            # cv2.imwrite("env_debug/image.jpg", rgb)
+        # plt.imshow(rgb, interpolation='nearest')
+        # cv2.imwrite("env_debug/image.jpg", rgb)
         plt.draw()
         plt.pause(0.001)
 
