@@ -1,6 +1,6 @@
 # Adversarial Skill Networks: Unsupervised Robot Skill Learning from Video
 
-This code implements Adversarial Skill Networks, an approach for unsupervised skill learning from video. Concretely, our approach learns a task-agnostic skill embedding space from unlabeled multiview videos. We combine a metric learning loss, which utilizes temporal video coherence to learn a state representation, with an entropy regularized adversarial skill-transfer loss. The learned embedding enables training of continuous control policies to solve novel tasks that require the interpolation of previously seen skills. More information at our [project page](http://robotskills.cs.uni-freiburg.de/).
+This repository is a PyTorch implementation of Adversarial Skill Networks (ASN), an approach for unsupervised skill learning from video. Concretely, our approach learns a task-agnostic skill embedding space from unlabeled multiview videos. We combine a metric learning loss, which utilizes temporal video coherence to learn a state representation, with an entropy regularized adversarial skill-transfer loss. The learned embedding enables training of continuous control policies to solve novel tasks that require the interpolation of previously seen skills. More information at our [project page](http://robotskills.cs.uni-freiburg.de/).
 
 <p align="center">
   <img src="http://robotskills.cs.uni-freiburg.de/images/motivation.png" width="75%"/>
@@ -12,14 +12,14 @@ If you find the code helpful please consider citing our work
 @INPROCEEDINGS{mees20icra_asn,
   author = {Oier Mees and Markus Merklinger and Gabriel Kalweit and Wolfram Burgard},
   title = {Adversarial Skill Networks: Unsupervised Robot Skill Learning from Videos},
-  booktitle = {Proceedings of the IEEE International Conference on Robotics and Automation  (ICRA)},
+  booktitle = {Proceedings of the IEEE International Conference on Robotics and Automation (ICRA)},
   year = 2020,
   address = {Paris, France}
 }
 ```
 
 ## Installation
-We provide a simple package to install ASN preferably in a virtual environment. We have tested the code with Ubuntu 18.04.
+We provide a simple package to install ASN preferably in a virtual environment. We have tested the code with Ubuntu 18.04 and PyTorch 1.4.0.
 If not installed, install virtualenv and virtualenvwrapper with --user option: <br>
 ```pip install --user virtualenv virtualenvwrapper```
 
@@ -50,7 +50,12 @@ First download and extract the [dataset](http://robotskills.cs.uni-freiburg.de/d
 python train_asn.py --train-dir /tmp/real_combi_task3/videos/train/ --val-dir-metric /tmp/real_combi_task3/videos/val/  --train-filter-tasks cstack
 ```
 
+## Evaluation
+Evaluate the trained ASN model on the video alignment of a novel task and visualize the corresponding t-SNE plots of the learned embedding:<br>
 
+```
+python eval_asn.py --load-model pretrained_model/model_best.pth.tar  --val-dir-metric /tmp/real_combi_task3/videos/val/ --task cstack
+```
 
 ## Pretrained Model	
 We provide the weights, a log file and a t-SNE visualization for a pretrained model for the default setting [here](asn/pretrained_model.zip). This model achieves an alignment loss of 0.1662 on the unseen color stacking task, which is very close to the 0.165 reported on the paper.
