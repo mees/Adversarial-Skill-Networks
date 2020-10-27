@@ -34,9 +34,11 @@ if __name__ == '__main__':
     print('use_cuda: {}'.format(use_cuda))
     asn, start_epoch, global_step, _ = create_model(
         use_cuda, args.load_model)
+    log.info('start_epoch: {}'.format(start_epoch))
     log.info('asn: {}'.format(asn.__class__.__name__))
     img_size = 299
     vid_name_to_task_func = transform_vid_name_to_task(args.task)
+    log.info('args.val_dir_metric: {}'.format(args.val_dir_metric))
     dataloader_val = get_dataloader_val(args.val_dir_metric,
                                         args.num_views,
                                         args.batch_size,
@@ -60,3 +62,4 @@ if __name__ == '__main__':
         visualize_embeddings(model_forward, dataloader_val,
                              save_dir=args.save_folder,
                              label_func=vid_name_to_task_func)
+

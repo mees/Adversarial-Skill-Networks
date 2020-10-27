@@ -90,8 +90,8 @@ def get_train_transformer(img_size=299):
                                # hue=0.03,# use for real block data
                                saturation=0.3),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406],
-                             [0.229, 0.224, 0.225])
+        # transforms.Normalize([0.485, 0.456, 0.406],
+                             # [0.229, 0.224, 0.225])
     ])
     return transformer_train
 
@@ -101,8 +101,8 @@ def get_val_transformer(img_size=299):
         transforms.ToPILImage(),  # expects rgb, moves channel to front
         transforms.CenterCrop(img_size),
         transforms.ToTensor(),  # image 0-255 to 0. - 1.0
-        transforms.Normalize([0.485, 0.456, 0.406],
-                             [0.229, 0.224, 0.225])
+        # transforms.Normalize([0.485, 0.456, 0.406],
+                             # [0.229, 0.224, 0.225])
     ])
     return transformer_val
 

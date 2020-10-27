@@ -227,7 +227,7 @@ def create_model(use_cuda, load_model_file=None, **kwargs):
         start_step = checkpoint.get('step', 0)
         training_args = checkpoint.get('training_args', None)
         optimizer_state_dict = checkpoint['optimizer_state_dict']
-        asn.load_state_dict(checkpoint['model_state_dict'])
+        asn.load_state_dict(checkpoint['model_state_dict'], strict=False)
         log.info("Restoring Model from: {}, step {}, datetime {}".format(
             load_model_file, start_step, checkpoint.get('datetime')))
 
