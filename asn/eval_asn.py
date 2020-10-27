@@ -32,7 +32,7 @@ if __name__ == '__main__':
     log.info("args: {}".format(args))
     use_cuda = torch.cuda.is_available()
     print('use_cuda: {}'.format(use_cuda))
-    asn, start_epoch, global_step, _, _ = create_model(
+    asn, start_epoch, global_step, _ = create_model(
         use_cuda, args.load_model)
     log.info('asn: {}'.format(asn.__class__.__name__))
     img_size = 299
@@ -48,14 +48,15 @@ if __name__ == '__main__':
         if use_cuda:
             frame_batch = frame_batch.cuda()
         emb = asn.forward(frame_batch)
-        return emb  # .data.cpu().numpy()
+        return emb.data.cpu().numpy()
 
     asn.eval()
-    loss_val, *_ = view_pair_alignment_loss(model_forward,
-                                            args.num_views,
-                                            dataloader_val)
-    log.info('loss_val: {}'.format(loss_val))
-    # label function: task name to label
-    visualize_embeddings(model_forward, dataloader_val,
-                         save_dir=args.save_folder,
-                         lable_func=vid_name_to_task_func)
+    with torch.no_grad():
+        loss_val, *_ = view_pair_alignment_loss(model_forward,
+                                                args.num_views,
+                                                dataloader_val)
+        log.info('loss_val: {}'.format(loss_val))
+        # label function: task name to label
+        visualize_embeddings(model_forward, dataloader_val,
+                             save_dir=args.save_folder,
+                             label_func=vid_name_to_task_func)

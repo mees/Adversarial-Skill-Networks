@@ -251,7 +251,7 @@ def main():
                 # save a tsne plot
                 visualize_embeddings(model_forward_cuda, dataloader_val, summary_writer=None,
                                      global_step=global_step, save_dir=args.save_folder,
-                                     lable_func=vid_name_to_task)
+                                     label_func=vid_name_to_task)
             loss_val, nn_dist, dist_view_pais, frame_distribution_err_cnt = view_pair_alignment_loss(model_forward_np,
                                                                                                      args.num_views,
                                                                                                      dataloader_val)
