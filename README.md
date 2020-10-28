@@ -58,7 +58,7 @@ python eval_asn.py --load-model pretrained_model/model_best.pth.tar  --val-dir-m
 ```
 
 ## Pretrained Model	
-We provide the weights, a log file and a t-SNE visualization for a pretrained model for the default setting [here](asn/pretrained_model.zip). This model achieves an alignment loss of 0.1662 on the unseen color stacking task, which is very close to the 0.165 reported on the paper.
+We provide the weights, a log file and a t-SNE visualization for a pretrained model for the default setting [here](asn/pretrained_model.zip). This model achieves an alignment loss of 0.1638 on the unseen color stacking task, which is very close to the 0.165 reported on the paper.
 
 
 
