@@ -250,8 +250,6 @@ def save_vid_worker(img_files, view_i, save_dir, tag, img_size, fps):
 def main():
     args = get_args()
     args.out_dir = os.path.expanduser(args.out_dir)
-    image_size = (args.img_height, args.img_width)
-
     ports = list(map(int, args.ports.split(',')))
     log.info('ports: {}'.format(ports))
     sample_events = [multiprocessing.Event() for _ in ports]

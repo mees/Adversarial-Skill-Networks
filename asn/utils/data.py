@@ -158,7 +158,6 @@ def get_data_loader(use_cuda, path_imgs, epochs, n_process=2,
     epoch = 0
     epoch_ranks = np.zeros(n_process, dtype=np.int)
     while epoch < epochs:
-        t_s = time.time()
         rank, epoch_rank_i, dataset = queue.get()  # blocks until there is new data
         epoch_ranks[rank] = epoch_rank_i
         epoch = epoch_ranks.min()

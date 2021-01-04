@@ -179,12 +179,6 @@ def main():
     args = parser.parse_args()
     random_frame_sample_timeit(args.task_vid)
 
-    for rgb in VideoFrameSampler(args.task_vid):
-        # plt.imshow(rgb, interpolation='nearest')
-        # cv2.imwrite("env_debug/image.jpg", rgb)
-        plt.draw()
-        plt.pause(0.001)
-
     v = VideoFrameSampler(args.task_vid)
     imgs = v.get_all()
     for i in range(len(v)):

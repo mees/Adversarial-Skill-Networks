@@ -145,8 +145,6 @@ def _aligment_loss_process_loop(queue_data, queue_results, fill_frame_diff=True)
         embeddings = queue_data.get()
         results = get_vid_aligment_loss_pair(embeddings)
         queue_results.put(results)
-    log.info("_aligment_loss_process_loop END")
-
 
 def get_embeddings(func_model_forward, data_loader, n_views, func_view_pair_emb_done=None, seq_len=None, stride=None):
     """loss for alignment for view pairs, based on knn distance
@@ -165,7 +163,6 @@ def get_embeddings(func_model_forward, data_loader, n_views, func_view_pair_emb_
     num_view_paris = 0
     num_total_frames = 0
     view_pair_emb = {}
-    seq_fames = []
     for i, data in enumerate(data_loader):
         # compute the emb for a batch
         frames_batch = data['frame']
@@ -208,7 +205,6 @@ def get_embeddings(func_model_forward, data_loader, n_views, func_view_pair_emb_
                 # compute embeds if all frames
                 if last:
                     # loop over all seq as batch
-                    n = len(view_pair_emb[name]["frame"][view])
                     frame_batch = torch.cat(view_pair_emb[name]["frame"][view])
                     for i, batch_seq in enumerate(
                             sliding_window(frame_batch, seq_len, step=1, stride=stride, drop_last=True)):

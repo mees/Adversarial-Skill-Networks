@@ -126,7 +126,6 @@ def get_fourcc(file_name):
 def main():
     args = get_args()
     input_imgs_file = os.path.expanduser(args.input_imgs)
-    dt = np.float32
     n_views = args.num_views
     image_size = (args.img_height, args.img_width)
     assert os.path.isdir(input_imgs_file), "input not a dir"
@@ -135,7 +134,6 @@ def main():
     view_pair_idx = args.view_idx
     input_imgs_file = [view_piar_vid[view_pair_idx] for view_piar_vid in input_imgs_file]
     input_imgs_file = sklearn.utils.shuffle(input_imgs_file)
-    ex_to_fourcc = {'.mov': 'jpeg', '.mp4': 'MP4V', '.avi': "MJPG"}
     fourcc = get_fourcc(args.output_vid_name)
     log.info("output vid: {}".format(args.output_vid_name))
     fps = args.fps

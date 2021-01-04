@@ -76,7 +76,6 @@ def _fill_empty_imgs(imgs, color):
     """fills a 2d img array so that all shapes are same"""
     assert len(imgs) and len(imgs[0]), "no images"
     max_len = sorted([len(i_v) for i_v in imgs], reverse=True)[0]
-    fill_img = np.full(imgs[0][0].shape, color)
 
     def add_fillers(imgs_to_fill):
         # for _ in range(len(imgs_to_fill) - max_len):

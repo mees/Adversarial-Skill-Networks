@@ -47,7 +47,6 @@ def accuracy(data_loader, model_forward, criterion, img_keys, lable_keys, n_batc
 
             inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
             outputs = model_forward(inputs)
-            n_classes = outputs.size(1)
             if num_domain_frames != 1:
                 # mak out multi frames labels
                 bl = inputs.size(0)

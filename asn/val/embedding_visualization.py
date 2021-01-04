@@ -80,13 +80,11 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
         transforms.Resize(img_size),
         transforms.ToTensor(),  # image 0-255 to 0. - 1.0
     ])
-    n_views = data_loader.dataset.n_views
     cnt_data = 0
     labels = []
     view_pair_name_labels = []
     labels_frame_idx = []
     vid_len_frame_idx = []
-    view_pair_emb_seq = {}
     with tqdm(total=len(data_loader), desc='computing embeddings for {} frames'.format(len(data_loader))) as pbar:
         for i, data in enumerate(data_loader):
             # compute the emb for a batch
@@ -136,9 +134,7 @@ def visualize_embeddings(func_model_forward, data_loader, summary_writer=None,
     else:
         log.info('start TSNE fit')
         labels = labels[:data_len]
-        metadata = [[s] for s in labels]
         imgs = flip_imgs(frames.numpy(), rgb_to_front=False)
-        s_time = time.time()
         rnn_tag = "_seq{}_stride{}".format(seq_len, stride) if seq_len is not None else ""
         X_tsne = TSNE_multi(n_jobs=4, perplexity=40).fit_transform(
             embeddings)  # perplexity = 40, theta=0.5

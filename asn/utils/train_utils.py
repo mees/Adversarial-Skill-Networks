@@ -56,30 +56,6 @@ def init_log_tb(save_folder):
     writer = SummaryWriter(tb_log_dir)
     return writer
 
-
-def multi_vid_batch_loss(criterion_metric, batch, targets, n_views, num_vid_example, img_debug=None, save_folder=None):
-    """ multiple vid in batch, metric loss for multi example for frame ,only 2 view support"""
-    batch_size = batch.size(0)
-    emb_view0, emb_view1 = batch[:batch_size // 2], batch[batch_size // 2:]
-    t_view0, t_view1 = targets[:batch_size // 2], targets[batch_size // 2:]
-    batch_example_vid = emb_view0.size(0) // num_vid_example
-    slid_vid = lambda x: sliding_window(x, winSize=batch_example_vid, step=batch_example_vid)
-    loss = torch.zeros(1).cuda()
-    loss = torch.autograd.Variable(loss)
-    # compute loss for each video
-    for emb_view0_vid, emb_view1_vid, t0, t1 in zip(slid_vid(emb_view0), slid_vid(emb_view1), slid_vid(t_view0),
-                                                    slid_vid(t_view1)):
-        loss += criterion_metric(torch.cat((emb_view0_vid, emb_view1_vid)), torch.cat((t0, t1)))
-    if img_debug is not None:
-        v0, v1 = img_debug[:batch_size // 2], img_debug[batch_size // 2:]
-        create_dir_if_not_exists(os.path.join(save_folder, "images/"))
-        join_log_path = lambda x: os.path.join(save_folder, "images", x)
-        for view_i, (v, b) in enumerate(zip(slid_vid(v0), slid_vid(v1))):
-            f_name = join_log_path("multi_example_input_{}.png".format(view_i))
-            save_image(torch.cat((v, b)), f_name)
-    return loss
-
-
 def get_train_transformer(img_size=299):
     transformer_train = transforms.Compose([
         transforms.ToPILImage(),
@@ -112,7 +88,7 @@ def val_fit_task_label(vid_name_to_task, all_view_pair_names):
     all_view_pair_names = [vid_name_to_task(f) for f in all_view_pair_names]
     comm_name_to_lable = preprocessing.LabelEncoder()
     comm_name_to_lable.fit(all_view_pair_names)
-    lable_domain = comm_name_to_lable.transform(all_view_pair_names)  # tset fit
+    #lable_domain = comm_name_to_lable.transform(all_view_pair_names)  # tset fit
     num_classes = len(comm_name_to_lable.classes_)
     name_classes = comm_name_to_lable.classes_
     log.info("number of vid domains task: {}".format(

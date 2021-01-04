@@ -79,7 +79,7 @@ def main():
         imgs_vid = VideoFrameSampler(
             f, dtype=dt, resize_shape=image_size, to_rgb=False).get_all()
         total_frames = len(imgs_vid)
-        log.info("file {} with frames: {}".format(f, len(imgs_vid)))
+        log.info("file {} with frames: {}".format(f, total_frames))
         imgs.append(imgs_vid)
 
     show_sequence(imgs, delay=0, n_frame=n_frame,

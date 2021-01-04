@@ -210,7 +210,6 @@ class DoubleViewPairDataset(Dataset):
                     1), loc=mean, scale=std).astype(int)[0]
                 sample_frame_index = min(similar_frame_index, frames_length - 1)
                 sample_frame_index = max(0, sample_frame_index)
-                sample_frame_index = sample_frame_index
 
             # get frame form vid
             vid_file = self.video_paths[view_pair_index][view_index]
