@@ -11,7 +11,7 @@ def _pdist(A, squared=False, eps=1e-4):
 
 
 class LiftedStruct(nn.Module):
-    """ Lifted Structured Feature Embedding
+    """Lifted Structured Feature Embedding
     https://arxiv.org/abs/1511.06452
     based on: https://github.com/vadimkantorov/metriclearningbench
     see also: https://gist.github.com/bkj/565c5e145786cfd362cffdbd8c089cf4
@@ -26,18 +26,16 @@ class LiftedStruct(nn.Module):
         # L = \frac{1}{2|P|}\sum_{(i,j)\in P} \max(0, J_{i,j})^2
         d = _pdist(embeddings, squared=False, eps=eps)
         # pos mat  1 wehre labes are same for distane mat
-        pos = torch.eq(*[labels.unsqueeze(dim).expand_as(d)
-                         for dim in [0, 1]]).type_as(d)
+        pos = torch.eq(*[labels.unsqueeze(dim).expand_as(d) for dim in [0, 1]]).type_as(d)
 
         neg_i = torch.mul((margin - d).exp(), 1 - pos).sum(1).expand_as(d)
-        loss += torch.sum(F.relu(pos.triu(1) * ((neg_i +
-                                                 neg_i.t()).log() + d)).pow(2)) / (pos.sum() - len(d))
+        loss += torch.sum(F.relu(pos.triu(1) * ((neg_i + neg_i.t()).log() + d)).pow(2)) / (pos.sum() - len(d))
         return loss
 
 
 class Margin(nn.Module):
     """
-        same pair margin
+    same pair margin
     """
 
     def forward(self, embeddings, labels, margin=1.0, eps=1e-4):
@@ -47,8 +45,7 @@ class Margin(nn.Module):
         loss = torch.autograd.Variable(loss)
         d = _pdist(embeddings, squared=False, eps=eps)
         # pos mat  1 where labels are same for distance mat
-        pos = torch.eq(*[labels.unsqueeze(dim).expand_as(d)
-                         for dim in [0, 1]]).type_as(d)
+        pos = torch.eq(*[labels.unsqueeze(dim).expand_as(d) for dim in [0, 1]]).type_as(d)
 
         neg = (pos < 1).type_as(d)
         # pos_i = torch.mul((d-margin).exp(), 1 - neg).sum(1).expand_as(d)

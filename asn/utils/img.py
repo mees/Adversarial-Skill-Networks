@@ -25,8 +25,8 @@ def np_rgb_to_cv(np_array_rgb):
 
 def np_shape_to_cv(shape):
     """flip to match cv
-        Mat (rows, cols)<=>(height, width)
-        but size in cv (width, height)
+    Mat (rows, cols)<=>(height, width)
+    but size in cv (width, height)
     """
     return shape[::-1]
 
@@ -67,8 +67,7 @@ def resize_with_border(img, shape, border_color=[1, 1, 1]):
         border_v = int((((im_col / im_row) * img.shape[1]) - img.shape[0]) / 2)
     else:
         border_h = int((((im_row / im_col) * img.shape[0]) - img.shape[1]) / 2)
-    img = cv2.copyMakeBorder(img, border_v, border_v, border_h, border_h,
-                             cv2.BORDER_CONSTANT, value=border_color)
+    img = cv2.copyMakeBorder(img, border_v, border_v, border_h, border_h, cv2.BORDER_CONSTANT, value=border_color)
     return cv2.resize(img, (im_row, im_col))
 
 
@@ -88,12 +87,20 @@ def _fill_empty_imgs(imgs, color):
     return [add_fillers(i_v) for i_v in imgs]
 
 
-def montage(imgs=[[]], margin_top=20, margin_bottom=20,
-            margin_left=20, margin_right=20,
-            margin_separate_vertical=20, margin_separate_horizontal=20,
-            margin_color_bgr=[1, 1, 1],
-            titles=None, fontScale=0.5, title_pos=None):
-    """ creates a montage image with imgs in a grid layout
+def montage(
+    imgs=[[]],
+    margin_top=20,
+    margin_bottom=20,
+    margin_left=20,
+    margin_right=20,
+    margin_separate_vertical=20,
+    margin_separate_horizontal=20,
+    margin_color_bgr=[1, 1, 1],
+    titles=None,
+    fontScale=0.5,
+    title_pos=None,
+):
+    """creates a montage image with imgs in a grid layout
     Args:
         imgs: 2d list with numpy images with same shapes
         titles: 2d list with strings used das a title at the top of a img,
@@ -135,8 +142,7 @@ def montage(imgs=[[]], margin_top=20, margin_bottom=20,
             m_l = margin_separate_vertical if h_index != 0 else margin_left
             m_r = 0 if h_index != len(i_v) - 1 else margin_right
 
-            i = cv2.copyMakeBorder(i_h, m_top, m_bot, m_l, m_r,
-                                   cv2.BORDER_CONSTANT, value=margin_color_bgr)
+            i = cv2.copyMakeBorder(i_h, m_top, m_bot, m_l, m_r, cv2.BORDER_CONSTANT, value=margin_color_bgr)
             if titles is not None:
                 text = ""
                 if v_index < len(titles) and h_index < len(titles[v_index]):
@@ -144,14 +150,11 @@ def montage(imgs=[[]], margin_top=20, margin_bottom=20,
                 title_font = cv2.FONT_HERSHEY_SIMPLEX
                 fontColor = (0, 0, 0)  # black
                 thickness = 1
-                text_size, _ = cv2.getTextSize(
-                    text, title_font, fontScale, thickness)
+                text_size, _ = cv2.getTextSize(text, title_font, fontScale, thickness)
                 # title position at the top of img
                 if title_pos is None:
-                    title_pos_top = (m_l, max(
-                        m_top - text_size[1], text_size[1]))
-                cv2.putText(i, text, title_pos_top,
-                            title_font, fontScale, fontColor, thickness)
+                    title_pos_top = (m_l, max(m_top - text_size[1], text_size[1]))
+                cv2.putText(i, text, title_pos_top, title_font, fontScale, fontColor, thickness)
             h_imgs.append(i)
         imgs_border.append(h_imgs)
     # create one image
@@ -160,32 +163,26 @@ def montage(imgs=[[]], margin_top=20, margin_bottom=20,
     return imgs_concat
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     img_size = (300, 200)
     black = np.zeros((*img_size, 3))
     white = np.ones((*img_size, 3))
-    titels = [["black", "white", "black"],
-              ["white", "black-rot", "white"],
-              ["black", "white", "black"]]
+    titels = [["black", "white", "black"], ["white", "black-rot", "white"], ["black", "white", "black"]]
     black_rot = cv2.rotate(black, rotateCode=cv2.ROTATE_90_CLOCKWISE)
-    black_rot = resize_with_border(
-        black_rot, img_size, border_color=[0.5, 0.5, 0.5])
-    imgs = [[black, white, black], [
-        white, black_rot, white], [black, white, black]]
-    imgs_concat = montage(imgs, titles=titels,
-                          margin_color_bgr=[0.5, 0.5, 0.5])
-    cv2.imshow('Main', imgs_concat)
+    black_rot = resize_with_border(black_rot, img_size, border_color=[0.5, 0.5, 0.5])
+    imgs = [[black, white, black], [white, black_rot, white], [black, white, black]]
+    imgs_concat = montage(imgs, titles=titels, margin_color_bgr=[0.5, 0.5, 0.5])
+    cv2.imshow("Main", imgs_concat)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
     # create a vid
-    fourcc = cv2.VideoWriter_fourcc('j', 'p', 'e', 'g')
+    fourcc = cv2.VideoWriter_fourcc("j", "p", "e", "g")
     shape = np_shape_to_cv(imgs_concat.shape[:2])
     vid_writer = cv2.VideoWriter("out.mov", fourcc, 1, shape)
     for frame in range(10):
         bgr = np.uint8(np_rgb_to_cv(imgs_concat) * 255)
         cv2.imwrite("tmp.jpg", bgr)
         imgs = np.roll(np.roll(imgs, 1, axis=1), 1, axis=0)
-        imgs_concat = montage(imgs, titles=titels,
-                              margin_color_bgr=[0.5, 0.5, 0.5])
+        imgs_concat = montage(imgs, titles=titels, margin_color_bgr=[0.5, 0.5, 0.5])
         vid_writer.write(cv2.resize(bgr, shape, cv2.INTER_NEAREST))
     vid_writer.release()

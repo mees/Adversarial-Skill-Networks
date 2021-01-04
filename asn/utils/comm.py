@@ -1,14 +1,14 @@
+from contextlib import contextmanager
 import itertools
 import os
 import os.path as op
 import re
 import sys
-from contextlib import contextmanager
 
 import git
 import numpy as np
-import torch
 from sklearn import preprocessing
+import torch
 
 
 @contextmanager
@@ -62,12 +62,10 @@ def split_view_file_name(filename):
         if split in filename:
             file_name_all, file_extension = op.splitext(filename)
             file_name_all = filename.split(split)
-            assert len(file_name_all) > 1, "no \"{}\" in vid file name: {}".format(
-                split, filename)
-            assert len(file_name_all) <= 2, "multimple  \"{}\" in vid file name: {}".format(
-                split, filename)
+            assert len(file_name_all) > 1, 'no "{}" in vid file name: {}'.format(split, filename)
+            assert len(file_name_all) <= 2, 'multimple  "{}" in vid file name: {}'.format(split, filename)
 
-            re_num = re.findall(r'\d+', file_name_all[1])[0]
+            re_num = re.findall(r"\d+", file_name_all[1])[0]
             view_num_i = int(re_num)
             vid_file_comm = file_name_all[0]
             extension = file_name_all[1].replace(re_num, "")
@@ -87,8 +85,7 @@ def get_other_view_files(n_views, vid_file_view_i, v_types=(".mov", ".mp4", ".av
         if j != view_num_i:
             for ex in itertools.chain((extension,), v_types):
                 # check for other views and file types
-                fullname_j = op.join(
-                    path, vid_file_comm + view_split + str(j) + ex)
+                fullname_j = op.join(path, vid_file_comm + view_split + str(j) + ex)
 
                 if op.exists(fullname_j) and fullname_j not in other_view_files:
                     assert vid_file_view_i != fullname_j
@@ -98,23 +95,20 @@ def get_other_view_files(n_views, vid_file_view_i, v_types=(".mov", ".mp4", ".av
     return other_view_files
 
 
-def get_view_pair_vid_files(n_views, vid_dir, append=True,
-                            v_types=(".mov", ".mp4", ".avi"), join_path=False):
+def get_view_pair_vid_files(n_views, vid_dir, append=True, v_types=(".mov", ".mp4", ".avi"), join_path=False):
     # TODO REFACTOR
     vid_dir = op.expanduser(vid_dir.strip())
-    assert op.isdir(
-        vid_dir), "path is not a directory {}".format(vid_dir)
+    assert op.isdir(vid_dir), "path is not a directory {}".format(vid_dir)
     vid_files_to_compare = get_files(vid_dir, join_path=True, file_types=v_types)
     lr_start = len(vid_files_to_compare)
     view_pair_files = []
     while len(vid_files_to_compare):
         f = vid_files_to_compare.pop()
         view_n = get_other_view_files(n_views, f, v_types)
-        assert not f in view_n, "%s : %s" % (f, view_n)
+        assert f not in view_n, "%s : %s" % (f, view_n)
         comm_name, _, _, _ = split_view_file_name(f)
         # rm other view names
-        vid_files_to_compare = [
-            s for s in vid_files_to_compare if comm_name != split_view_file_name(s)[0]]
+        vid_files_to_compare = [s for s in vid_files_to_compare if comm_name != split_view_file_name(s)[0]]
         view_n.append(f)
         view_n = sorted(view_n, key=lambda x: split_view_file_name(x)[1])
         # if join_path:
@@ -140,14 +134,15 @@ def sliding_window(sequence, winSize, step=1, stride=1, drop_last=False):
     """
 
     # Verify the inputs
-    if not ((type(winSize) == type(0)) and (type(step) == type(0))):
-        print("(type(winSize) == type(0))", (type(winSize) == type(0)))
+    if not ((type(winSize) == type(0)) and (type(step) == type(0))):  # noqa: E721
+        print("(type(winSize) == type(0))", (type(winSize) == type(0)))  # noqa: E721
         raise Exception("type(winSize) and type(step) must be int.")
     if step > winSize:
         raise Exception("step must not be larger than winSize.")
     if winSize * stride > len(sequence):
         raise Exception(
-            "winSize*stride ={}*{} must not be larger than sequence length={}.".format(winSize, stride, len(sequence)))
+            "winSize*stride ={}*{} must not be larger than sequence length={}.".format(winSize, stride, len(sequence))
+        )
 
     n = len(sequence)
     last_val = sequence[-1]
@@ -161,8 +156,7 @@ def sliding_window(sequence, winSize, step=1, stride=1, drop_last=False):
 
 
 def get_git_commit_hash(repo_path):
-    repo = git.Repo(search_parent_directories=True,
-                    path=os.path.dirname(repo_path))
+    repo = git.Repo(search_parent_directories=True, path=os.path.dirname(repo_path))
     assert repo, "not a repo"
     changed_files = [item.a_path for item in repo.index.diff(None)]
     if changed_files:
@@ -176,7 +170,7 @@ def tensor_to_np(data):
 
 
 def create_label_func(min_val, max_val, bins, clip=False, dtype=np.float32):
-    """ generate function to encode continuous values to n classes
+    """generate function to encode continuous values to n classes
     return mapping function to label or to one hot label
     bins(float): number of bins between min and max
     bins(array_like): boearder for new bins
@@ -230,10 +224,12 @@ def create_label_func(min_val, max_val, bins, clip=False, dtype=np.float32):
 
 
 def start_tb_task(path_tb, port=6006):
-    from tensorboard import default
-    from tensorboard import program
     import logging
+
+    from tensorboard import default, program
+
     try:
+
         class TensorBoardTool:
             def __init__(self, dir_path, port):
                 self.dir_path = dir_path
@@ -241,13 +237,13 @@ def start_tb_task(path_tb, port=6006):
 
             def run(self):
                 # Remove http messages
-                log = logging.getLogger('werkzeug').setLevel(logging.CRITICAL)
+                log = logging.getLogger("werkzeug").setLevel(logging.CRITICAL)
                 logging.getLogger("tensorflow").setLevel(logging.CRITICAL)
                 # Start tensorboard server
                 tb = program.TensorBoard(default.get_plugins(), default.get_assets_zip_provider())
-                tb.configure(argv=[None, '--logdir', self.dir_path, '--port', str(self.port)])
+                tb.configure(argv=[None, "--logdir", self.dir_path, "--port", str(self.port)])
                 url = tb.launch()
-                print('TensorBoard at %s/#scalars&_smoothingWeight=0' % url)
+                print("TensorBoard at %s/#scalars&_smoothingWeight=0" % url)
                 # Tensorboard tool launch
 
         tb_tool = TensorBoardTool(path_tb, port)

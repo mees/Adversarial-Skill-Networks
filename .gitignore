@@ -103,7 +103,7 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-#vim 
+#vim
 # Swap
 [._]*.s[a-v][a-z]
 [._]*.sw[a-p]

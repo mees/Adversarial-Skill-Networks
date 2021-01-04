@@ -1,4 +1,5 @@
 import itertools
+
 import numpy as np
 import torch  # before cv2
 from torch import multiprocessing
@@ -8,8 +9,9 @@ from asn.utils.log import log
 
 
 def get_distances(emb1, emb2):
-    assert np.shape(emb1) == np.shape(emb2), "dist shape not same, " \
-                                             "emb1.shape{} and emb1.shape {}".format(emb1.shape, emb2.shape)
+    assert np.shape(emb1) == np.shape(emb2), "dist shape not same, " "emb1.shape{} and emb1.shape {}".format(
+        emb1.shape, emb2.shape
+    )
     return np.linalg.norm(emb1 - emb2)
 
 
@@ -22,8 +24,7 @@ def get_knn(task_embedding, imgs_embeddings, frame_debug, k=1):
     indexes_compare = np.arange(imgs_embeddings.shape[0])
     # get all distances for the task frame embedding to all other
     # imgs_embeddings frames
-    dist = np.array([get_distances(task_embedding, e)
-                     for e in imgs_embeddings])
+    dist = np.array([get_distances(task_embedding, e) for e in imgs_embeddings])
     index_sorted = dist.argsort()[:k]  # k smallest indexes
     sorted_index_imgs_k = indexes_compare[index_sorted]
     sorted_dist_k = dist[index_sorted]
@@ -60,8 +61,7 @@ def get_all_knn_indexes(task_embeddings, multi_vid_embeddings_to_compare, k=1):
         frame_n_knn = []
         # find all knn to for each frame
         for index_vid, imgs_embeddings in enumerate(multi_vid_embeddings_to_compare):
-            k_frame_index, k_dist = get_knn(
-                task_emb, imgs_embeddings, frame, k)
+            k_frame_index, k_dist = get_knn(task_emb, imgs_embeddings, frame, k)
             # k_frame_index =[knn_test[0][0]]
             # k_dist =[knn_test[0][1]]
             f = np.zeros((k, 3))
@@ -105,11 +105,9 @@ def get_vid_aligment_loss_pair(embeddings, fill_frame_diff=True):
                 max_diff = len(emb1) - len(emb2)
                 size_embedding = emb1.shape[1]
                 if max_diff > 0:
-                    emb2 = np.concatenate(
-                        (emb2, np.full((max_diff, size_embedding), emb1[-1])))
+                    emb2 = np.concatenate((emb2, np.full((max_diff, size_embedding), emb1[-1])))
                 elif max_diff < 0:
-                    emb1 = np.concatenate(
-                        (emb1, np.full((-max_diff, size_embedding), emb2[-1])))
+                    emb1 = np.concatenate((emb1, np.full((-max_diff, size_embedding), emb2[-1])))
             knn_img_indexes = get_all_knn_indexes(emb1, [emb2], k=k)
             # get loss assuption view paire
             n_frames = knn_img_indexes.shape[0]
@@ -127,14 +125,16 @@ def get_vid_aligment_loss_pair(embeddings, fill_frame_diff=True):
             nn_dist.append(np.mean(knn_img_indexes[:, 0, 1]))
             # print infos
             view_pair_lens = "->".join([str(len(e)) for e in [emb1, emb2]])
-            log.info("aligment loss pair {:>30} with {} frames, loss {:>6.5}, mean nn dist {:>6.5}".format(
-                comm_name, view_pair_lens, loss_comp, np.mean(nn_dist)))
+            log.info(
+                "aligment loss pair {:>30} with {} frames, loss {:>6.5}, mean nn dist {:>6.5}".format(
+                    comm_name, view_pair_lens, loss_comp, np.mean(nn_dist)
+                )
+            )
 
         # get the distances for all view paris for the same frame
         for emb1, emb2 in itertools.combinations(view_pair_task_emb, 2):
             min_frame_len = min(np.shape(emb1)[0], np.shape(emb2)[0])
-            dist_view_i = [get_distances(e1, e2) for e1, e2 in zip(
-                emb1[:min_frame_len], emb2[:min_frame_len])]
+            dist_view_i = [get_distances(e1, e2) for e1, e2 in zip(emb1[:min_frame_len], emb2[:min_frame_len])]
             dist_view_pairs.append(np.mean(dist_view_i))
         loss, nn_dist, dist_view_pairs = [np.mean(i) for i in [loss, nn_dist, dist_view_pairs]]
     return loss, nn_dist, dist_view_pairs, error_hist_cnts
@@ -145,6 +145,7 @@ def _aligment_loss_process_loop(queue_data, queue_results, fill_frame_diff=True)
         embeddings = queue_data.get()
         results = get_vid_aligment_loss_pair(embeddings)
         queue_results.put(results)
+
 
 def get_embeddings(func_model_forward, data_loader, n_views, func_view_pair_emb_done=None, seq_len=None, stride=None):
     """loss for alignment for view pairs, based on knn distance
@@ -165,18 +166,18 @@ def get_embeddings(func_model_forward, data_loader, n_views, func_view_pair_emb_
     view_pair_emb = {}
     for i, data in enumerate(data_loader):
         # compute the emb for a batch
-        frames_batch = data['frame']
+        frames_batch = data["frame"]
         num_total_frames += len(frames_batch)
         if seq_len is None:
             emb = func_model_forward(frames_batch)
             # add emb to dict and to quue if all frames
-            for e, name, view, last in zip(emb, data["common name"], data["view"].numpy(),
-                                           data['is last frame'].numpy()):
+            for e, name, view, last in zip(
+                emb, data["common name"], data["view"].numpy(), data["is last frame"].numpy()
+            ):
                 if name not in view_pair_emb:
                     # empty lists for each view
                     # note: with [[]] * n_views the reference is same
-                    view_pair_emb[name] = {"embs": [[] for _ in range(n_views)], "done": [
-                                                                                             False] * n_views}
+                    view_pair_emb[name] = {"embs": [[] for _ in range(n_views)], "done": [False] * n_views}
                 view_pair_emb[name]["embs"][view].append(e)
                 view_pair_emb[name]["done"][view] = last
                 # if all emb for all frames add to queue and compute knn
@@ -185,20 +186,22 @@ def get_embeddings(func_model_forward, data_loader, n_views, func_view_pair_emb_
                     # print("all frame for ",name, "with frames",view_pair_lens )
                     num_view_paris += 1
                     view_pair_emb_name = view_pair_emb.pop(name, None)
-                    emb_dict = {name: [np.array(e)
-                                       for e in view_pair_emb_name["embs"]]}
+                    emb_dict = {name: [np.array(e) for e in view_pair_emb_name["embs"]]}
                     if func_view_pair_emb_done is not None:
                         func_view_pair_emb_done(emb_dict)
         else:
             # get all frames for vid
-            for frame, name, view, last in zip(frames_batch, data["common name"], data["view"].numpy(),
-                                               data['is last frame'].numpy()):
+            for frame, name, view, last in zip(
+                frames_batch, data["common name"], data["view"].numpy(), data["is last frame"].numpy()
+            ):
                 if name not in view_pair_emb:
                     # empty lists for each view
                     # note: with [[]] * n_views the reference is same
-                    view_pair_emb[name] = {"frame": [[] for _ in range(n_views)],
-                                           "embs": [[] for _ in range(n_views)],
-                                           "done": [False] * n_views}
+                    view_pair_emb[name] = {
+                        "frame": [[] for _ in range(n_views)],
+                        "embs": [[] for _ in range(n_views)],
+                        "done": [False] * n_views,
+                    }
                 view_pair_emb[name]["frame"][view].append(frame.view(1, *frame.size()))
                 view_pair_emb[name]["done"][view] = last
 
@@ -207,7 +210,8 @@ def get_embeddings(func_model_forward, data_loader, n_views, func_view_pair_emb_
                     # loop over all seq as batch
                     frame_batch = torch.cat(view_pair_emb[name]["frame"][view])
                     for i, batch_seq in enumerate(
-                            sliding_window(frame_batch, seq_len, step=1, stride=stride, drop_last=True)):
+                        sliding_window(frame_batch, seq_len, step=1, stride=stride, drop_last=True)
+                    ):
                         if len(batch_seq) == seq_len:
                             emb = func_model_forward(batch_seq)
                             assert len(emb) == 1
@@ -215,16 +219,16 @@ def get_embeddings(func_model_forward, data_loader, n_views, func_view_pair_emb_
                 if all(view_pair_emb[name]["done"]):
                     num_view_paris += 1
                     view_pair_emb_name = view_pair_emb.pop(name, None)
-                    emb_dict = {name: [np.array(e)
-                                       for e in view_pair_emb_name["embs"]]}
+                    emb_dict = {name: [np.array(e) for e in view_pair_emb_name["embs"]]}
                     if func_view_pair_emb_done is not None:
                         func_view_pair_emb_done(emb_dict)
 
     return num_view_paris, num_total_frames
 
 
-def view_pair_alignment_loss(func_model_forward, n_views, data_loader, num_workers=1, frame_distribution=[],
-                             seq_len=None, stride=None):
+def view_pair_alignment_loss(
+    func_model_forward, n_views, data_loader, num_workers=1, frame_distribution=[], seq_len=None, stride=None
+):
     """loss for alignment for view pairs, based on knn distance
         Alignment is the scaled absolute difference between the ground truth time
         and the knn aligned time.
@@ -257,8 +261,9 @@ def view_pair_alignment_loss(func_model_forward, n_views, data_loader, num_worke
     # the process take data form queue_data and store the results in queue_results
     for i in range(num_workers):
         # for i in range(n_process):TODO
-        p = multiprocessing.Process(target=_aligment_loss_process_loop, args=(
-            queue_data, queue_results, frame_distribution), daemon=True)
+        p = multiprocessing.Process(
+            target=_aligment_loss_process_loop, args=(queue_data, queue_results, frame_distribution), daemon=True
+        )
         knn_process.append(p)
         p.start()
 
@@ -267,7 +272,8 @@ def view_pair_alignment_loss(func_model_forward, n_views, data_loader, num_worke
 
     # compute embbedings and add to the queue
     num_view_paris, num_total_frames = get_embeddings(
-        func_model_forward, data_loader, n_views, func_emb_done, seq_len=seq_len, stride=stride)
+        func_model_forward, data_loader, n_views, func_emb_done, seq_len=seq_len, stride=stride
+    )
 
     # wait for all knn Processes
     while num_view_paris != len(losses):

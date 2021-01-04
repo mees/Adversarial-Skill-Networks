@@ -7,7 +7,7 @@ This repository is a PyTorch implementation of Adversarial Skill Networks (ASN),
 </p>
 
 ## Reference
-If you find the code helpful please consider citing our work 
+If you find the code helpful please consider citing our work
 ```
 @INPROCEEDINGS{mees20icra_asn,
   author = {Oier Mees and Markus Merklinger and Gabriel Kalweit and Wolfram Burgard},
@@ -57,7 +57,7 @@ Evaluate the trained ASN model on the video alignment of a novel task and visual
 python eval_asn.py --load-model pretrained_model/model_best.pth.tar  --val-dir-metric /tmp/real_combi_task3/videos/val/ --task cstack
 ```
 
-## Pretrained Model	
+## Pretrained Model
 We provide the weights, a log file and a t-SNE visualization for a pretrained model for the default setting [here](asn/pretrained_model.zip). This model achieves an alignment loss of 0.1638 on the unseen color stacking task, which is very close to the 0.165 reported on the paper.
 
 
@@ -74,7 +74,7 @@ We provide a python script to record and synchronize several webcams. First chec
 
 ```
 ls -ltrh /dev/video*
-``` 
+```
 
 Now start the recording for n webcams:
 ```

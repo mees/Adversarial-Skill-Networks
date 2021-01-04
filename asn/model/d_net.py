@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+
 from asn.utils.log import log
 
 
@@ -9,7 +10,7 @@ class Discriminator(nn.Module):
     def __init__(self, D_in, H, z_dim, d_out):
         super().__init__()
         self.z_dim = z_dim
-        log.info('Discriminator domain net in_channels: {} out: {} hidden {}, z dim {}'.format(D_in, d_out, H, z_dim))
+        log.info("Discriminator domain net in_channels: {} out: {} hidden {}, z dim {}".format(D_in, d_out, H, z_dim))
         self.encoder = torch.nn.Sequential(
             torch.nn.Linear(D_in, H),
             nn.Dropout2d(0.25),

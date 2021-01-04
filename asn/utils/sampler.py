@@ -2,18 +2,16 @@ import numpy as np
 from sklearn.utils import shuffle
 from torch.utils.data.sampler import Sampler
 
-from asn.utils.dataset import (DoubleViewPairDataset,
-                               get_positive_frame_index)
+from asn.utils.dataset import DoubleViewPairDataset, get_positive_frame_index
 
 
 class ViewPairSequenceSampler(Sampler):
     """ sampler to use with the DoubleViewPairDataset to sample n sequences form each view pair """
 
-    def __init__(self, dataset, examples_per_sequence, batch_size,
-                 similar_frame_margin=0, shuffle_sequence=False):
+    def __init__(self, dataset, examples_per_sequence, batch_size, similar_frame_margin=0, shuffle_sequence=False):
         """
-            examples_per_sequence: number of example from one vid
-            similar_frame_margin: window to sample a similar frame
+        examples_per_sequence: number of example from one vid
+        similar_frame_margin: window to sample a similar frame
         """
         self.dataset = dataset
         self._examples_per_sequence = examples_per_sequence
@@ -25,12 +23,12 @@ class ViewPairSequenceSampler(Sampler):
         self._sequences_per_batch = batch_size // examples_per_sequence
         self._examples_per_sequence = examples_per_sequence
         self._similar_frame_margin = similar_frame_margin
-        self._num_samples = self.dataset.get_number_view_pairs() * \
-                            self._examples_per_sequence
+        self._num_samples = self.dataset.get_number_view_pairs() * self._examples_per_sequence
         min_len_vid = min(min(l) for l in self.dataset.frame_lengths)
         # check if vids long enough to smaple wihout replace with margins
-        assert min_len_vid >= (1 + self._similar_frame_margin * 2) * \
-               batch_size, "vid to small for batch size and margin"
+        assert (
+            min_len_vid >= (1 + self._similar_frame_margin * 2) * batch_size
+        ), "vid to small for batch size and margin"
 
     def __iter__(self):
         """ sample n examples_per_sequence, without replace choosen frame index (optional with margin) """
@@ -47,9 +45,7 @@ class ViewPairSequenceSampler(Sampler):
                 anchor_index = np.random.choice(frames)
                 # remove similar frames, so that not sampled again
                 # -> so they can not be a negative
-                frame_to_rm = get_positive_frame_index(anchor_index,
-                                                       num_frames,
-                                                       self._similar_frame_margin)
+                frame_to_rm = get_positive_frame_index(anchor_index, num_frames, self._similar_frame_margin)
                 frames = [f for f in frames if f not in frame_to_rm]
                 sample_index = self.dataset.idx_lookup[view_pair_index][anchor_index]
                 idx.append(sample_index)
@@ -66,18 +62,15 @@ class ViewPairSequenceSampler(Sampler):
 class SkillViewPairSequenceSampler(Sampler):
     """ sampler to use with the DoubleViewPairDataset to sample n sequences form each view pair """
 
-    def __init__(self, dataset,
-                 sequence_length,
-                 stride,
-                 sequences_per_vid_in_batch,
-                 batch_size,
-                 allow_same_frames_in_seq=False):
+    def __init__(
+        self, dataset, sequence_length, stride, sequences_per_vid_in_batch, batch_size, allow_same_frames_in_seq=False
+    ):
         """
-            dataset: DoubleViewPairDataset
-            sequence_length: length of seq
-            stride: take every n frame
-            sequences_per_vid_in_batch: number of example seq. from one vid on each batch
-            allow_same_frames_in_seq: allows same frame the seq, start frame can never be same
+        dataset: DoubleViewPairDataset
+        sequence_length: length of seq
+        stride: take every n frame
+        sequences_per_vid_in_batch: number of example seq. from one vid on each batch
+        allow_same_frames_in_seq: allows same frame the seq, start frame can never be same
         """
         self.dataset = dataset
         self._stride = stride  # frame steps
@@ -89,14 +82,16 @@ class SkillViewPairSequenceSampler(Sampler):
         assert batch_size % sequences_per_vid_in_batch * sequence_length == 0
         assert self._stride > 0
         # number of all frame in one epoch
-        self._num_samples = self.dataset.get_number_view_pairs() * \
-                            self._sequences_per_vid_in_batch * self._sequence_length
+        self._num_samples = (
+            self.dataset.get_number_view_pairs() * self._sequences_per_vid_in_batch * self._sequence_length
+        )
         self.allow_same_frames_in_seq = allow_same_frames_in_seq
         if not allow_same_frames_in_seq:
             min_len_vid = min(min(l) for l in self.dataset.frame_lengths)
             # check if vids long enough to smaple wihout replace with margins
-            assert min_len_vid >= sequence_length * self._sequences_per_vid_in_batch * \
-                   self._stride, "vid to small for batch size and seq len"
+            assert (
+                min_len_vid >= sequence_length * self._sequences_per_vid_in_batch * self._stride
+            ), "vid to small for batch size and seq len"
 
     def __iter__(self):
         """ sample n examples_per_sequence, without replace choosen frame index (optional with margin) """
@@ -121,8 +116,7 @@ class SkillViewPairSequenceSampler(Sampler):
                     frame_to_rm = [anchor_index]
                 else:
                     # remove all sampled frames
-                    frame_to_rm = range(anchor_index, anchor_index +
-                                        self._sequence_length * self._stride)
+                    frame_to_rm = range(anchor_index, anchor_index + self._sequence_length * self._stride)
                     assert len(frame_to_rm) == self._sequence_length * self._stride
                 frames = [f for f in frames if f not in frame_to_rm]
                 assert len(frames) >= self._sequence_length

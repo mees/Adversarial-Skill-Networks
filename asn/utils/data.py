@@ -1,13 +1,15 @@
 import time
+
 import numpy as np
 import torch
 from torch import multiprocessing
-from torch.utils.data import ConcatDataset, TensorDataset
-from torch.utils.data import DataLoader
+from torch.utils.data import ConcatDataset, DataLoader, TensorDataset
+
+from asn.utils.comm import get_view_pair_vid_files
 from asn.utils.img import flip_imgs
 from asn.utils.log import log
 from asn.utils.vid_to_np import VideoFrameSampler
-from asn.utils.comm import get_view_pair_vid_files
+
 
 def _sampler_process_loop(queue, sampler, epochs):
     sampler.init()
@@ -21,7 +23,6 @@ def _sampler_process_loop(queue, sampler, epochs):
 
 
 class Sampler(object):
-
     def __init__(self, rank=0, n_samper_process=1):
         assert rank >= 0
         assert n_samper_process > 0
@@ -55,8 +56,8 @@ class Sampler(object):
 class AlignmentViewPairSampler(Sampler):
     def __init__(self, n_views, vid_dir, image_size, n_frame=1, sample_size=-1, *args, **kwargs):
         """sample_size =-1 to get all frames at once elese the vid is dividen into
-            chunks ot the size sample_size
-            n_frame: take every n frame of the sequence
+        chunks ot the size sample_size
+        n_frame: take every n frame of the sequence
         """
         super().__init__(*args, **kwargs)
         assert n_views >= 2 and n_frame > 0
@@ -69,8 +70,7 @@ class AlignmentViewPairSampler(Sampler):
         self.vid_dir = vid_dir
 
     def init(self):
-        self.video_files = self.get_rank_working_part(
-            get_view_pair_vid_files(self.n_views, self.vid_dir))
+        self.video_files = self.get_rank_working_part(get_view_pair_vid_files(self.n_views, self.vid_dir))
         self.video_count = len(self.video_files)
         assert self.video_count, "no vids for worker"
         self.video_index = 0
@@ -99,15 +99,15 @@ class AlignmentViewPairSampler(Sampler):
             vid = VideoFrameSampler(f, resize_shape=self.frame_size, dtype=np.float32)
             max_len = self.sample_size
             if self.sample_size >= len(vid) or self.sample_size == -1:
-                log.warning(
-                    "vid {} wiht {}frames has less than for sample size".format(f, len(vid)))
+                log.warning("vid {} wiht {}frames has less than for sample size".format(f, len(vid)))
                 max_len = len(vid)
                 all_frames_sampled = True
             elif self.sample_frames_index + self.sample_size >= len(vid):
                 # last sample smaller
                 max_len = len(vid) - self.sample_frames_index
-                log.info("end {} with {} frames end size {}, index {}".format(
-                    f, len(vid), max_len, self.sample_frames_index))
+                log.info(
+                    "end {} with {} frames end size {}, index {}".format(f, len(vid), max_len, self.sample_frames_index)
+                )
                 all_frames_sampled = True
             imgs = np.empty((max_len, *self.frame_size, 3))
             for j in range(max_len):
@@ -124,8 +124,7 @@ class AlignmentViewPairSampler(Sampler):
         views = []
         all_frames_sampled = False
         if self.sample_size == -1 or self.n_frame != 1:
-            all_frames_sampled, views = True, self._sample_every_n_frame(
-                vid_files)
+            all_frames_sampled, views = True, self._sample_every_n_frame(vid_files)
         else:
             all_frames_sampled, views = self._sample_next_frames(vid_files)
 
@@ -136,22 +135,33 @@ class AlignmentViewPairSampler(Sampler):
         return TensorDataset(*views)
 
 
-def get_data_loader(use_cuda, path_imgs, epochs, n_process=2,
-                    minibatch_size=16, sample_size=8,
-                    image_size=(300, 300),
-                    shuffle=True,
-                    sampler_class=AlignmentViewPairSampler, **kwargs_samper):
+def get_data_loader(
+    use_cuda,
+    path_imgs,
+    epochs,
+    n_process=2,
+    minibatch_size=16,
+    sample_size=8,
+    image_size=(300, 300),
+    shuffle=True,
+    sampler_class=AlignmentViewPairSampler,
+    **kwargs_samper,
+):
     assert n_process > 0 and epochs > 0
     queue_max_size = n_process + 2
     queue = multiprocessing.Queue(queue_max_size)
     dataset_builder_process = []
     # start n Processes which add add data to the queue, will block if full
     for i in range(n_process):
-        sampler = sampler_class(rank=i, vid_dir=path_imgs, image_size=image_size,
-                                sample_size=sample_size, n_samper_process=n_process,
-                                **kwargs_samper)
-        p = multiprocessing.Process(target=_sampler_process_loop, args=(
-            queue, sampler, epochs), daemon=True)
+        sampler = sampler_class(
+            rank=i,
+            vid_dir=path_imgs,
+            image_size=image_size,
+            sample_size=sample_size,
+            n_samper_process=n_process,
+            **kwargs_samper,
+        )
+        p = multiprocessing.Process(target=_sampler_process_loop, args=(queue, sampler, epochs), daemon=True)
         p.start()
         dataset_builder_process.append(p)
 
@@ -162,10 +172,8 @@ def get_data_loader(use_cuda, path_imgs, epochs, n_process=2,
         epoch_ranks[rank] = epoch_rank_i
         epoch = epoch_ranks.min()
         data_loader = DataLoader(
-            dataset=dataset,
-            batch_size=minibatch_size,
-            shuffle=shuffle,  # shuffle in sampler
-            pin_memory=use_cuda)
+            dataset=dataset, batch_size=minibatch_size, shuffle=shuffle, pin_memory=use_cuda  # shuffle in sampler
+        )
 
         yield epoch, data_loader
 

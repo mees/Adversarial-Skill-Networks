@@ -25,8 +25,19 @@ def accuracy_batch(output, target, topk=(1,)):
     return res
 
 
-def accuracy(data_loader, model_forward, criterion, img_keys, lable_keys, n_batch=None, use_cuda=True, writer=None,
-             step_writer=None, task_names=None, plot_name="acc"):
+def accuracy(
+    data_loader,
+    model_forward,
+    criterion,
+    img_keys,
+    lable_keys,
+    n_batch=None,
+    use_cuda=True,
+    writer=None,
+    step_writer=None,
+    task_names=None,
+    plot_name="acc",
+):
     """ percent """
     acc_loss_top_1 = []
     criterion_loss = []
@@ -86,18 +97,14 @@ def tb_write_class_dist(writer, class_predictions, data_cnt, step_writer, task_n
         class_names = [str(c) for c in class_predictions.keys()]
     else:
         class_names = task_names
-        print('class_names: {}'.format(class_names))
+        print("class_names: {}".format(class_names))
 
     plot_confusion_matrix(ax, cm, class_names=class_names)
     fig.tight_layout()
     writer.add_figure(plot_name, fig, step_writer)
 
 
-def plot_confusion_matrix(ax, confusion_matrix,
-                          class_names=None,
-                          normalize=False,
-                          title=None,
-                          cmap=plt.cm.Oranges):
+def plot_confusion_matrix(ax, confusion_matrix, class_names=None, normalize=False, title=None, cmap=plt.cm.Oranges):
     """
     This function prints and plots the confusion matrix.
     Normalization can be applied by setting `normalize=True`.
@@ -105,9 +112,9 @@ def plot_confusion_matrix(ax, confusion_matrix,
     """
     if not title:
         if normalize:
-            title = 'Normalized class distribustion'
+            title = "Normalized class distribustion"
         else:
-            title = 'class distribustion, without normalization'
+            title = "class distribustion, without normalization"
     if confusion_matrix.shape[0] != confusion_matrix.shape[1]:
         log.warn("foun classes not same as predictions")
     # Compute confusion matrix
@@ -118,33 +125,35 @@ def plot_confusion_matrix(ax, confusion_matrix,
     else:
         classes = class_names
     if normalize:
-        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        cm = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
         print("Normalized confusion matrix")
     else:
-        print('Confusion matrix, without normalization')
+        print("Confusion matrix, without normalization")
 
-    im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
+    im = ax.imshow(cm, interpolation="nearest", cmap=cmap)
     ax.figure.colorbar(im, ax=ax)
     # We want to show all ticks...
-    ax.set(xticks=np.arange(cm.shape[1]),
-           yticks=np.arange(cm.shape[0]),
-           # ... and label them with the respective list entries
-           xticklabels=classes, yticklabels=classes,
-           title=title,
-           ylabel='True label',
-           xlabel='Predicted label')
+    ax.set(
+        xticks=np.arange(cm.shape[1]),
+        yticks=np.arange(cm.shape[0]),
+        # ... and label them with the respective list entries
+        xticklabels=classes,
+        yticklabels=classes,
+        title=title,
+        ylabel="True label",
+        xlabel="Predicted label",
+    )
 
     # Rotate the tick labels and set their alignment.
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
-             rotation_mode="anchor")
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
 
     # Loop over data dimensions and create text annotations.
     # fmt = '.2f' if normalize else 'd'
-    fmt = '.2f'
-    thresh = cm.max() / 2.
+    fmt = ".2f"
+    thresh = cm.max() / 2.0
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
-            ax.text(j, i, format(cm[i, j], fmt),
-                    ha="center", va="center",
-                    color="white" if cm[i, j] > thresh else "black")
+            ax.text(
+                j, i, format(cm[i, j], fmt), ha="center", va="center", color="white" if cm[i, j] > thresh else "black"
+            )
     return ax

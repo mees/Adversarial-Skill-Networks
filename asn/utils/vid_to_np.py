@@ -16,8 +16,7 @@ class VideoFrameSampler:
 
     def __init__(self, vid_path, resize_shape=None, dtype=np.uint8, to_rgb=True, torch_transformer=None):
         self._vid_path = os.path.expanduser(vid_path)
-        assert os.path.isfile(
-            self._vid_path), "vid not exists: {}".format(self._vid_path)
+        assert os.path.isfile(self._vid_path), "vid not exists: {}".format(self._vid_path)
         self.fps = None
         self.to_rgb = to_rgb
         self.approximate_frameCount = None
@@ -37,8 +36,7 @@ class VideoFrameSampler:
         else:
             cap = cap_open
         self.fps = int(cap.get(cv2.CAP_PROP_FPS))
-        self.approximate_frameCount = int(
-            cap.get(cv2.CAP_PROP_FRAME_COUNT))  # not accurate!
+        self.approximate_frameCount = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))  # not accurate!
         self.frameWidth = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.frameHeight = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         if cap_open is None:
@@ -112,7 +110,8 @@ class VideoFrameSampler:
             self._get_vid_info(cap)
         if frame_index < 0 or frame_index >= self.approximate_frameCount:
             msg = "frame {} to high for video {} with appr. {} frames".format(
-                frame_index, self._vid_path, self.approximate_frameCount)
+                frame_index, self._vid_path, self.approximate_frameCount
+            )
             raise IndexError(msg)
 
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
@@ -127,20 +126,24 @@ class VideoFrameSampler:
                 ok, bgr = cap.read()
                 try_count += 1
             msg = "read frame {} faild for video {} with appr. {} frames reduced to {}".format(
-                frame_index, self._vid_path, self.approximate_frameCount, frame_index - try_count)
+                frame_index, self._vid_path, self.approximate_frameCount, frame_index - try_count
+            )
             log.warning(msg)
         cap.release()
         assert bgr is not None, "faild reading frame for video frame {}, header frames {}".format(
-            frame_index, self.count_frames())
-        if self.resize_shape is not None and self.frameWidth != self.resize_shape[1] and self.frameHeight != \
-                self.resize_shape[0]:
+            frame_index, self.count_frames()
+        )
+        if (
+            self.resize_shape is not None
+            and self.frameWidth != self.resize_shape[1]
+            and self.frameHeight != self.resize_shape[0]
+        ):
             # cv2 mat size is fliped -> ::-1
-            bgr = cv2.resize(bgr, np_shape_to_cv(
-                self.resize_shape), cv2.INTER_NEAREST)
+            bgr = cv2.resize(bgr, np_shape_to_cv(self.resize_shape), cv2.INTER_NEAREST)
         if self.to_rgb:
             bgr = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
         if self.dtype in [np.float32, np.float64]:
-            return np.asarray(bgr / 255., dtype=self.dtype)
+            return np.asarray(bgr / 255.0, dtype=self.dtype)
         else:
             bgr = np.asarray(bgr, dtype=self.dtype)
             if self.torch_transformer is not None:
@@ -171,21 +174,21 @@ def random_frame_sample_timeit(vid_file):
 
 def main():
     from matplotlib import pyplot as plt
+
     plt.ion()
     plt.show()
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--task-vid', type=str, default='vid.mov')
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--task-vid", type=str, default="vid.mov")
     args = parser.parse_args()
     random_frame_sample_timeit(args.task_vid)
 
     v = VideoFrameSampler(args.task_vid)
     imgs = v.get_all()
     for i in range(len(v)):
-        plt.imshow(imgs[i], interpolation='nearest')
+        plt.imshow(imgs[i], interpolation="nearest")
         plt.draw()
         plt.pause(0.001)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

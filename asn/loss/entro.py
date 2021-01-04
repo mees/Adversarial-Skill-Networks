@@ -22,5 +22,5 @@ def marginalized_entropy(y):
 
 def entropy(y):
     y1 = F.softmax(y, dim=1) * F.log_softmax(y, dim=1)
-    y2 = 1. / y.size(0) * y1.sum()
+    y2 = 1.0 / y.size(0) * y1.sum()
     return y2

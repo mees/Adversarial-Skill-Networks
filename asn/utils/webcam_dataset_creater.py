@@ -1,58 +1,54 @@
 import argparse
-import os
-import subprocess
-import time
 from collections import defaultdict
 from contextlib import contextmanager
 from itertools import combinations
 from multiprocessing import Process
+import os
+import subprocess
+import time
 
 import cv2
 import numpy as np
 from torch import multiprocessing
 
 from asn.utils.comm import create_dir_if_not_exists
-from asn.utils.img import (montage, np_shape_to_cv)
+from asn.utils.img import montage, np_shape_to_cv
 from asn.utils.log import log
 
-'''
+"""
 show connected web cams:
 ls -ltrh /dev/video*
 
 # start recording for n views
 python utils/webcam_dataset_creater.py --ports 0,1 --tag test --display
 # Hit Ctrl-C when done collecting, upon which the script will compile videos for each view
-'''
+"""
 
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input-imgs', type=str,
-                        help="directory of file separated with \",\" like vid1.mov,vid2.mov",
-                        default="~/tcn_data/can_stacking_3_V6/videos/train")
-    parser.add_argument('--output-vid-name', type=str,
-                        default="out.mp4")
     parser.add_argument(
-        '--ports', help="webcam_ports of views with ',' as a seperator, use ls -ltrh /dev/video* to find ports",
-        type=str, required=True)
+        "--input-imgs",
+        type=str,
+        help='directory of file separated with "," like vid1.mov,vid2.mov',
+        default="~/tcn_data/can_stacking_3_V6/videos/train",
+    )
+    parser.add_argument("--output-vid-name", type=str, default="out.mp4")
     parser.add_argument(
-        '--fps', help="vido fpsw", type=int, default=24)
-    parser.add_argument(
-        '--img-height', help="vid output height", type=int, default=150)
-    parser.add_argument(
-        '--img-width', help="vid output width", type=int, default=150)
-    parser.add_argument(
-        '--num-frames', help="num of frames", type=int, default=500)
-    parser.add_argument(
-        '--tag', help="tag the video", type=str, required=True)
-    parser.add_argument(
-        '--out-dir', help="outout folder", type=str, default="/tmp/tcn_data/webcam")
-    parser.add_argument(
-        '--set-name', help="folder name of the datset val, train  folder", type=str, default="train")
-    parser.add_argument(
-        '--max-frame', help="max frames", type=int, default=1000)
-    parser.add_argument(
-        '--display', help="show frames", action='store_true')
+        "--ports",
+        help="webcam_ports of views with ',' as a seperator, use ls -ltrh /dev/video* to find ports",
+        type=str,
+        required=True,
+    )
+    parser.add_argument("--fps", help="vido fpsw", type=int, default=24)
+    parser.add_argument("--img-height", help="vid output height", type=int, default=150)
+    parser.add_argument("--img-width", help="vid output width", type=int, default=150)
+    parser.add_argument("--num-frames", help="num of frames", type=int, default=500)
+    parser.add_argument("--tag", help="tag the video", type=str, required=True)
+    parser.add_argument("--out-dir", help="outout folder", type=str, default="/tmp/tcn_data/webcam")
+    parser.add_argument("--set-name", help="folder name of the datset val, train  folder", type=str, default="train")
+    parser.add_argument("--max-frame", help="max frames", type=int, default=1000)
+    parser.add_argument("--display", help="show frames", action="store_true")
     return parser.parse_args()
 
 
@@ -72,7 +68,7 @@ def web_cam_samper(port):
         yield video_capture
     except Exception:
         video_capture.release()
-        log.info('release video_capture: {} port {}'.format(video_capture, port))
+        log.info("release video_capture: {} port {}".format(video_capture, port))
 
 
 @contextmanager
@@ -81,8 +77,7 @@ def vid_writer(output_vid_name, fps, frame_shape, frame_count=None):
     fourcc = get_fourcc(output_vid_name)
     # vid writer if shape isknows after rot
     out_shape_cv = np_shape_to_cv(frame_shape[:2])
-    vid_writer = cv2.VideoWriter(
-        output_vid_name, fourcc, fps, out_shape_cv)
+    vid_writer = cv2.VideoWriter(output_vid_name, fourcc, fps, out_shape_cv)
     # vid_writer.write(montage_image)
     yield vid_writer
     if frame_count is not None:
@@ -103,22 +98,23 @@ def close_open_web_cams():
     # TODO checko for port her
     # Try to find and kill hanging cv2 process_ids.
     try:
-        output = subprocess.check_output(['lsof -t /dev/video*'], shell=True)
-        log.info('Found hanging cv2 process_ids:')
+        output = subprocess.check_output(["lsof -t /dev/video*"], shell=True)
+        log.info("Found hanging cv2 process_ids:")
         log.info(output)
-        log.info('Killing hanging processes...')
+        log.info("Killing hanging processes...")
         output = str(output)
-        for process_id in output.split('\n')[:-1]:
-            subprocess.call(['kill %s' % process_id], shell=True)
+        for process_id in output.split("\n")[:-1]:
+            subprocess.call(["kill %s" % process_id], shell=True)
             time.sleep(3)
         # Recapture webcams.
     except subprocess.CalledProcessError:
         raise ValueError(
-            'Cannot connect to cameras. Try running: \n'
-            'ls -ltrh /dev/video* \n '
-            'to see which ports your webcams are connected to. Then hand those '
-            'ports as a comma-separated list to --webcam_ports, e.g. '
-            '--webcam_ports 0,1')
+            "Cannot connect to cameras. Try running: \n"
+            "ls -ltrh /dev/video* \n "
+            "to see which ports your webcams are connected to. Then hand those "
+            "ports as a comma-separated list to --webcam_ports, e.g. "
+            "--webcam_ports 0,1"
+        )
 
 
 def adjust_brightness(camera):
@@ -129,9 +125,9 @@ def adjust_brightness(camera):
 
 def sample_frames(webcam_ports, sample_events, num_frames):
     """
-        generator to sample for each webcam in a different processs and
-        yield synchronized, sample of a new frame is triggered with
-        sample event
+    generator to sample for each webcam in a different processs and
+    yield synchronized, sample of a new frame is triggered with
+    sample event
     """
     process_frames = []
     result_frames_qs = []
@@ -140,15 +136,13 @@ def sample_frames(webcam_ports, sample_events, num_frames):
         """ sample frame on event set """
         frame_cnt = 0
         with web_cam_samper(port) as camera:
-            log.info('port: {}'.format(port))
+            log.info("port: {}".format(port))
             adjust_brightness(camera)
             while True:
                 frame = sample_image(camera)
                 sample_time = time.time()
                 # log.info('port {} sample_time: {},frame_cnt {}'.format(port,sample_time,frame_cnt))
-                result_frames_q.put({"frame": frame,
-                                     "time": sample_time,
-                                     "num": frame_cnt})
+                result_frames_q.put({"frame": frame, "time": sample_time, "num": frame_cnt})
                 frame_cnt += 1
                 event_sync.wait()
                 event_sync.clear()
@@ -178,14 +172,13 @@ def get_fourcc(file_name):
         file_extension_out = file_name
     else:
         _, file_extension_out = os.path.splitext(file_name)
-    ex_to_fourcc = {'.mov': 'jpeg', '.mp4': 'MP4V', '.avi': "MJPG"}
+    ex_to_fourcc = {".mov": "jpeg", ".mp4": "MP4V", ".avi": "MJPG"}
     file_extension_out = file_extension_out.strip().lower()
     fourcc = ex_to_fourcc.get(file_extension_out, None)
     if fourcc is not None:
         fourcc = cv2.VideoWriter_fourcc(*fourcc)
     else:
-        raise ValueError("file type not supported, use: {}"
-                         .format(", ".join(ex_to_fourcc.keys())))
+        raise ValueError("file type not supported, use: {}".format(", ".join(ex_to_fourcc.keys())))
     return fourcc
 
 
@@ -196,15 +189,20 @@ def display_worker(port_data_queue):
         titels = [[str(d["num"]) for d in port_data.values()]]
         margin = imgs[0][0].shape[0] // 20
 
-        montage_image = montage(imgs,
-                                margin_color_bgr=[255] * 3,
-                                margin_top=margin, margin_bottom=margin,
-                                margin_left=margin, margin_right=margin,
-                                margin_separate_vertical=margin,
-                                margin_separate_horizontal=margin,
-                                titles=titels, fontScale=0.8)
+        montage_image = montage(
+            imgs,
+            margin_color_bgr=[255] * 3,
+            margin_top=margin,
+            margin_bottom=margin,
+            margin_left=margin,
+            margin_right=margin,
+            margin_separate_vertical=margin,
+            margin_separate_horizontal=margin,
+            titles=titels,
+            fontScale=0.8,
+        )
 
-        cv2.imshow('Video', montage_image)
+        cv2.imshow("Video", montage_image)
         cv2.waitKey(1)
 
 
@@ -250,8 +248,8 @@ def save_vid_worker(img_files, view_i, save_dir, tag, img_size, fps):
 def main():
     args = get_args()
     args.out_dir = os.path.expanduser(args.out_dir)
-    ports = list(map(int, args.ports.split(',')))
-    log.info('ports: {}'.format(ports))
+    ports = list(map(int, args.ports.split(",")))
+    log.info("ports: {}".format(ports))
     sample_events = [multiprocessing.Event() for _ in ports]
     num_frames = args.max_frame
     if args.display:
@@ -266,9 +264,9 @@ def main():
     p = Process(target=save_img_worker, args=img_args, daemon=True)
     p.start()
 
-    log.info('img_folder: {}'.format(img_folder))
-    log.info('vid_folder: {}'.format(vid_folder))
-    log.info('fps: {}'.format(args.fps))
+    log.info("img_folder: {}".format(img_folder))
+    log.info("vid_folder: {}".format(vid_folder))
+    log.info("fps: {}".format(args.fps))
 
     try:
         time_prev = time.time()
@@ -276,7 +274,7 @@ def main():
         for frame_cnt, port_data in enumerate(sample_frames(ports, sample_events, num_frames)):
             sample_time_dt = time.time() - time_prev
             if frame_cnt % 10 == 0:
-                log.info('frame {} time_prev: {}'.format(frame_cnt, time.time() - time_prev))
+                log.info("frame {} time_prev: {}".format(frame_cnt, time.time() - time_prev))
 
             time_prev = time.time()
             # set events to trigger cams
@@ -285,24 +283,25 @@ def main():
 
             if frame_cnt == 0:
                 # skip first frame because not  synchronized with event
-                log.info('START: {}'.format(frame_cnt))
+                log.info("START: {}".format(frame_cnt))
                 continue
-            elif (sample_time_dt - 1. / args.fps) > 0.1:
+            elif (sample_time_dt - 1.0 / args.fps) > 0.1:
                 log.warn("sampling frame taks too long for fps")
             # check sampel time diff
             if len(ports) > 1:
-                dt = [np.abs(p1["time"] - p2['time']) for p1, p2 in combinations(port_data.values(), 2)]
+                dt = [np.abs(p1["time"] - p2["time"]) for p1, p2 in combinations(port_data.values(), 2)]
                 # log.info('dt: {}'.format(np.mean(dt)))
                 if np.max(dt) > 0.1:
                     log.warn(
-                        'camera sample max time dt: {}, check light condition and camera models'.format(np.max(dt)))
+                        "camera sample max time dt: {}, check light condition and camera models".format(np.max(dt))
+                    )
             assert all(frame_cnt == d["num"] for d in port_data.values()), "out of sync"
 
             im_data_q.put(port_data)
             if args.display:
                 disp_q.put(port_data)
 
-            time.sleep(1. / args.fps)
+            time.sleep(1.0 / args.fps)
     except KeyboardInterrupt:
         # create vids form images save before
         im_shape = {p: d["frame"].shape for p, d in port_data.items()}
@@ -317,5 +316,5 @@ def main():
     cv2.destroyAllWindows()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

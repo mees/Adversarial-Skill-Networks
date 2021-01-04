@@ -24,13 +24,14 @@ DEBUG 	        10
 NOTSET 	        0
 """
 
+from contextlib import contextmanager
 import datetime
 import logging
 import os
-from contextlib import contextmanager
+
 from asn.utils.comm import create_dir_if_not_exists
 
-LOG_LEVEL = int(os.getenv('BR_GYM_LOG_LEVEL', logging.INFO))
+LOG_LEVEL = int(os.getenv("BR_GYM_LOG_LEVEL", logging.INFO))
 datefmt = "%H:%M:%S"
 # log msg format with mpi rank if used
 _mpi_rank_info = ""
@@ -42,24 +43,20 @@ try:
         _mpi_rank_info = "{:<10}".format("MPI np {} ".format(rank))
 except ImportError:
     rank = None
-_format = '%(asctime)s %(levelname)-7s {}%(module)-8s - %(message)s'.format(_mpi_rank_info)
+_format = "%(asctime)s %(levelname)-7s {}%(module)-8s - %(message)s".format(_mpi_rank_info)
 
 log = logging.getLogger()
 try:
     # color log format
     from colorlog import ColoredFormatter
 
-    _format_color = '%(asctime)s %(log_color)s%(levelname)-7s %(reset) s%(module)-8s {}- %(message)s'.format(
-        _mpi_rank_info)
-    colors = {'DEBUG': 'reset',
-              'INFO': 'reset',
-              'WARNING': 'bold_yellow',
-              'ERROR': 'bold_red',
-              'CRITICAL': 'bold_red'}
+    _format_color = "%(asctime)s %(log_color)s%(levelname)-7s %(reset) s%(module)-8s {}- %(message)s".format(
+        _mpi_rank_info
+    )
+    colors = {"DEBUG": "reset", "INFO": "reset", "WARNING": "bold_yellow", "ERROR": "bold_red", "CRITICAL": "bold_red"}
 
     # logging.root.setLevel(logging.DEBUG)
-    formatter = ColoredFormatter(
-        _format_color, log_colors=colors, datefmt=datefmt)
+    formatter = ColoredFormatter(_format_color, log_colors=colors, datefmt=datefmt)
 
 except ImportError:
     formatter = logging.Formatter(_format, datefmt=datefmt)
@@ -92,14 +89,15 @@ def suppress_logging():
 
 def set_log_file(log_file, mpi_only_log_rank=None):
     """
-        mpi_only_rank(int or NOne), mpi rank only to log to the file
+    mpi_only_rank(int or NOne), mpi rank only to log to the file
     """
     global _file_handler
     # create file handler which logs even debug messages
     # always overte file unless multi mpi log
     mode = "a" if mpi_only_log_rank is None else "w"
-    mpi_info = "only mpi rank {}".format(
-        mpi_only_log_rank) if mpi_only_log_rank is not None and rank is not None else ""
+    mpi_info = (
+        "only mpi rank {}".format(mpi_only_log_rank) if mpi_only_log_rank is not None and rank is not None else ""
+    )
     if rank is None or mpi_only_log_rank is None or rank == mpi_only_log_rank:
         if _file_handler is not None:
             log.removeHandler(_file_handler)
