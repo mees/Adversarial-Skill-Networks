@@ -1,17 +1,17 @@
 default_language_version:
-    python: python3.6
+    python: python3.8
 repos:
   - repo: https://github.com/psf/black
     rev: stable
     hooks:
       - id: black
-        language_version: python3.6
+        language_version: python3.8
 
   - repo: https://gitlab.com/pycqa/flake8
-    rev: 3.7.9
+    rev: 3.8.4
     hooks:
       - id: flake8
-        additional_dependencies: [-e, "git+git://github.com/pycqa/pyflakes.git@1911c20#egg=pyflakes"]
+        additional_dependencies: [-e, "git+git://github.com/pycqa/pyflakes.git@c72d6cf#egg=pyflakes"]
 
   - repo: https://github.com/pre-commit/mirrors-isort
     rev: v5.6.4
