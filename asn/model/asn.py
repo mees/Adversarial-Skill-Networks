@@ -6,9 +6,9 @@ import shutil
 
 import numpy as np
 import torch
-from torch import nn
+import torch.nn as nn
 from torch.autograd import Variable
-from torch.nn import functional as F
+import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torchvision import models
 
@@ -256,7 +256,6 @@ def save_model(model, optimizer, training_args, is_best, model_folder, step):
         os.makedirs(model_folder)
     filename = os.path.join(model_folder, "model.pth.tar")
     torch.save(state, filename)
-    checkpoint = torch.load(filename)
 
     log.info("Saved Model from: {}, step {}".format(filename, step))
     if is_best:

@@ -3,7 +3,7 @@ import functools
 
 import numpy as np
 import torch
-from torch import optim
+import torch.optim as optim
 from torch.autograd import Variable
 from torch.backends import cudnn
 
@@ -110,7 +110,6 @@ def main():
     )
 
     all_view_pair_names = dataloader_train.dataset.get_all_comm_view_pair_names()
-    all_view_pair_frame_lengths = dataloader_train.dataset.frame_lengths
 
     # for every task one label based on video name
     # not used to train the models

@@ -100,7 +100,6 @@ def get_view_pair_vid_files(n_views, vid_dir, append=True, v_types=(".mov", ".mp
     vid_dir = op.expanduser(vid_dir.strip())
     assert op.isdir(vid_dir), "path is not a directory {}".format(vid_dir)
     vid_files_to_compare = get_files(vid_dir, join_path=True, file_types=v_types)
-    lr_start = len(vid_files_to_compare)
     view_pair_files = []
     while len(vid_files_to_compare):
         f = vid_files_to_compare.pop()
@@ -145,7 +144,6 @@ def sliding_window(sequence, winSize, step=1, stride=1, drop_last=False):
         )
 
     n = len(sequence)
-    last_val = sequence[-1]
     for i in range(0, n, step):
         last = min(i + winSize * stride, n)
         ret = sequence[i:last:stride]
@@ -205,8 +203,6 @@ def create_label_func(min_val, max_val, bins, clip=False, dtype=np.float32):
     assert len(le.classes_) == expected_bins_cnt
 
     le_one_hot.fit(le.classes_)
-    y = le.transform(x_fit)
-    yhot = le_one_hot.transform(x_fit)
 
     def _enc_lables(data):
         fit = tensor_to_np(data)
@@ -237,7 +233,7 @@ def start_tb_task(path_tb, port=6006):
 
             def run(self):
                 # Remove http messages
-                log = logging.getLogger("werkzeug").setLevel(logging.CRITICAL)
+                logging.getLogger("werkzeug").setLevel(logging.CRITICAL)
                 logging.getLogger("tensorflow").setLevel(logging.CRITICAL)
                 # Start tensorboard server
                 tb = program.TensorBoard(default.get_plugins(), default.get_assets_zip_provider())

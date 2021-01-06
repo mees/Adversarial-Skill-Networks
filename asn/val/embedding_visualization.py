@@ -10,7 +10,6 @@ import matplotlib
 # Force matplotlib to not use any Xwindows backend.
 matplotlib.use("Agg")
 from collections import OrderedDict
-import time
 
 import cv2
 from matplotlib import offsetbox
@@ -159,8 +158,6 @@ def visualize_embeddings(
             max_frame=vid_len_frame_idx,
             vid_lable=view_pair_name_labels,
         )
-    del embeddings, imgs, labels, X_tsne
-
 
 def plt_labels_blow(ax, legend_handels):
     box = ax.get_position()
@@ -173,7 +170,7 @@ def plt_labels_blow(ax, legend_handels):
 
 
 def plt_labeled_data(
-    ax, X, labels_str, plt_cm=plt.cm.gist_ncar, lable_filter_legend=None, index_color_factor=None, hide_legend=False
+    ax, X, labels_str, plt_cm=plt.cm.gist_ncar, label_filter_legend=None, index_color_factor=None, hide_legend=False
 ):
     assert X.shape[0] == len(labels_str), "plt X shape {}, string lable len {}".format(X.shape[0], len(labels_str))
     le = preprocessing.LabelEncoder()
@@ -189,20 +186,17 @@ def plt_labeled_data(
         # norm for vid len
         colors = [plt_cm(y_i / float(c_n)) for y_i, c_n in zip(y, index_color_factor)]
         # factor
-    legend_elements = ax.scatter(X[:, 0], X[:, 1], color=colors)
-    # plt some points again to get lable hadles, added iteralbel labes to ax.scatter cant be filder
-    #  and to handler
-    # find ould legend elements if filtered
-    filtered_leged = []
+    scatter = ax.scatter(X[:, 0], X[:, 1], color=colors)
+    filtered_legend = []
 
     def check_filter(l):
-        return lable_filter_legend is None or lable_filter_legend(l)
+        return label_filter_legend is None or label_filter_legend(l)
 
     for l in metadata_header:
-        if check_filter(l) and l not in filtered_leged:
-            filtered_leged.append(l)
+        if check_filter(l) and l not in filtered_legend:
+            filtered_legend.append(l)
 
-    # get for each class one (if not filterd) legend handle
+    # get for each class one (if not filtered) legend handle
     legend_elements = {}
     if not hide_legend:
         for i in range(X.shape[0]):
@@ -210,10 +204,10 @@ def plt_labeled_data(
             if l not in legend_elements and check_filter(l):
                 h = ax.scatter(X[i, 0], X[i, 1], color=plt_cm(y[i] / float(n_classes)), label=l)
                 legend_elements[l] = h
-                if len(legend_elements) == len(filtered_leged):
-                    # all handels found
+                if len(legend_elements) == len(filtered_legend):
+                    # all handles found
                     break
-        # sort lables:
+        # sort labels:
         legend_elements = OrderedDict(sorted(legend_elements.items()))
         # Shrink current axis's height by 10% on the bottom
         plt_labels_blow(ax, list(legend_elements.values()))
@@ -266,7 +260,7 @@ def plot_embedding(X, labels_str, title, imgs=None, save_dir=None, frame_lable=N
             ax,
             X,
             frame_lable,
-            lable_filter_legend=lambda l: l % 50 == 0,
+            label_filter_legend=lambda l: l % 50 == 0,
             plt_cm=plt.cm.Spectral,
             index_color_factor=max_frame,
         )
@@ -275,7 +269,7 @@ def plot_embedding(X, labels_str, title, imgs=None, save_dir=None, frame_lable=N
     if vid_lable is not None:
         # plt the view pair as classe
         ax = plt.subplot(224)
-        plt_labeled_data(ax, X, vid_lable, lable_filter_legend=lambda x: False)
+        plt_labeled_data(ax, X, vid_lable, label_filter_legend=lambda x: False)
 
         ax.set_title("view pair as label")
 
@@ -351,7 +345,7 @@ def main():
     if args.model_mode == "asn":
         from asn.model.asn import create_model
 
-        asn_model, epoch, global_step, _, _ = create_model(use_cuda, args.model)
+        asn_model, epoch, global_step, _ = create_model(use_cuda, args.model)
 
         def model_forward(frame_batch, to_numpy=False):
             if use_cuda:

@@ -8,10 +8,9 @@ from tensorboardX import SummaryWriter
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from torchvision.utils import save_image
 
 import asn
-from asn.utils.comm import create_dir_if_not_exists, get_git_commit_hash, sliding_window
+from asn.utils.comm import get_git_commit_hash, sliding_window
 from asn.utils.dataset import DoubleViewPairDataset, ViewPairDataset
 from asn.utils.log import log, set_log_file
 from asn.utils.sampler import SkillViewPairSequenceSampler, ViewPairSequenceSampler

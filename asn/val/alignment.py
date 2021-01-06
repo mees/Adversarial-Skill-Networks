@@ -2,7 +2,7 @@ import itertools
 
 import numpy as np
 import torch  # before cv2
-from torch import multiprocessing
+import torch.multiprocessing as multiprocessing
 
 from asn.utils.comm import sliding_window
 from asn.utils.log import log

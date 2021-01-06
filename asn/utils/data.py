@@ -2,7 +2,7 @@ import time
 
 import numpy as np
 import torch
-from torch import multiprocessing
+import torch.multiprocessing as multiprocessing
 from torch.utils.data import ConcatDataset, DataLoader, TensorDataset
 
 from asn.utils.comm import get_view_pair_vid_files
