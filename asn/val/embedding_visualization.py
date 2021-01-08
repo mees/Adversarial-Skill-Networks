@@ -159,6 +159,7 @@ def visualize_embeddings(
             vid_lable=view_pair_name_labels,
         )
 
+
 def plt_labels_blow(ax, legend_handels):
     box = ax.get_position()
     ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])

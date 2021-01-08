@@ -3,8 +3,8 @@ import functools
 
 import numpy as np
 import torch
-import torch.optim as optim
 from torch.backends import cudnn
+import torch.optim as optim
 
 from asn.loss.entro import entropy, marginalized_entropy
 from asn.loss.metric_learning import LiftedCombined, LiftedStruct
