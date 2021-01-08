@@ -4,7 +4,6 @@ import functools
 import numpy as np
 import torch
 import torch.optim as optim
-from torch.autograd import Variable
 from torch.backends import cudnn
 
 from asn.loss.entro import entropy, marginalized_entropy
@@ -182,11 +181,11 @@ def main():
         sample_batched = next(iter_metric)
         # metric loss
         img = torch.cat([sample_batched[key_views[0]], sample_batched[key_views[1]]])
-        embeddings = model_forward_cuda(Variable(img))
+        embeddings = model_forward_cuda(img)
         n = sample_batched[key_views[0]].size(0)
         anchor_emb, positive_emb = embeddings[:n], embeddings[n:]
         label_positive_pair = np.arange(n)
-        labels = Variable(torch.Tensor(np.concatenate([label_positive_pair, label_positive_pair]))).cuda()
+        labels = torch.from_numpy(np.concatenate([label_positive_pair, label_positive_pair])).cuda()
 
         # METRIC loss
         if examples_per_seq == 1:
@@ -198,7 +197,7 @@ def main():
         sample_batched_domain = next(iter_domain)
 
         img_domain = torch.cat([sample_batched_domain[key_views[0]], sample_batched_domain[key_views[1]]])
-        emb_asn = model_forward_cuda(Variable(img_domain))
+        emb_asn = model_forward_cuda(img_domain)
 
         if num_domain_frames != 1:
             # multiple frames as skills

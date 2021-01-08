@@ -21,11 +21,10 @@ class LiftedStruct(nn.Module):
         loss = torch.zeros(1)
         if torch.cuda.is_available():
             loss = loss.cuda()
-        loss = torch.autograd.Variable(loss)
         # L_{ij} = \log (\sum_{i, k} exp\{m - D_{ik}\} + \sum_{j, l} exp\{m - D_{jl}\}) + D_{ij}
         # L = \frac{1}{2|P|}\sum_{(i,j)\in P} \max(0, J_{i,j})^2
         d = _pdist(embeddings, squared=False, eps=eps)
-        # pos mat  1 wehre labes are same for distane mat
+        # pos mat  1 where labels are same for distance mat
         pos = torch.eq(*[labels.unsqueeze(dim).expand_as(d) for dim in [0, 1]]).type_as(d)
 
         neg_i = torch.mul((margin - d).exp(), 1 - pos).sum(1).expand_as(d)
@@ -42,7 +41,6 @@ class Margin(nn.Module):
         loss = torch.zeros(1)
         if torch.cuda.is_available():
             loss = loss.cuda()
-        loss = torch.autograd.Variable(loss)
         d = _pdist(embeddings, squared=False, eps=eps)
         # pos mat  1 where labels are same for distance mat
         pos = torch.eq(*[labels.unsqueeze(dim).expand_as(d) for dim in [0, 1]]).type_as(d)

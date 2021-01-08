@@ -56,7 +56,6 @@ def accuracy(
             if use_cuda:
                 inputs, targets = inputs.cuda(), targets.cuda()
 
-            inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
             outputs = model_forward(inputs)
             if num_domain_frames != 1:
                 # mak out multi frames labels

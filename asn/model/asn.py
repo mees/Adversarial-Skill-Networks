@@ -7,7 +7,6 @@ import shutil
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torchvision import models
@@ -76,8 +75,8 @@ class SpatialSoftmax(nn.Module):
         feature = feature.view(-1, self.height * self.width)
 
         softmax_attention = F.softmax(feature / self.temperature, dim=-1)
-        expected_x = torch.sum(Variable(self.pos_x) * softmax_attention, dim=1, keepdim=True)
-        expected_y = torch.sum(Variable(self.pos_y) * softmax_attention, dim=1, keepdim=True)
+        expected_x = torch.sum(self.pos_x * softmax_attention, dim=1, keepdim=True)
+        expected_y = torch.sum(self.pos_y * softmax_attention, dim=1, keepdim=True)
         expected_xy = torch.cat([expected_x, expected_y], 1)
         feature_keypoints = expected_xy.view(-1, self.channel * 2)
 

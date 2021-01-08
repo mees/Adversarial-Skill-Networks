@@ -232,7 +232,6 @@ def multi_vid_batch_loss(criterion_metric, batch, targets, num_vid_example):
     batch_example_vid = emb_view0.size(0) // num_vid_example
     slid_vid = lambda x: sliding_window(x, winSize=batch_example_vid, step=batch_example_vid)
     loss = torch.zeros(1).cuda()
-    loss = torch.autograd.Variable(loss)
     # compute loss for each video
     for emb_view0_vid, emb_view1_vid, t0, t1 in zip(
         slid_vid(emb_view0), slid_vid(emb_view1), slid_vid(t_view0), slid_vid(t_view1)
