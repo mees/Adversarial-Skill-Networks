@@ -12,7 +12,7 @@ matplotlib.use("Agg")
 from collections import OrderedDict
 
 import cv2
-from matplotlib import offsetbox
+import matplotlib.offsetbox as offsetbox
 import matplotlib.pyplot as plt
 from MulticoreTSNE import MulticoreTSNE as TSNE_multi
 import numpy as np
@@ -140,7 +140,7 @@ def visualize_embeddings(
         embeddings = embeddings[: len(labels)]
         frames = frames[: len(labels)]
     if len(labels) == 0:
-        labels = None
+        log.warn("length of labels is zero!")
     else:
         log.info("start TSNE fit")
         labels = labels[:data_len]
@@ -187,7 +187,7 @@ def plt_labeled_data(
         # norm for vid len
         colors = [plt_cm(y_i / float(c_n)) for y_i, c_n in zip(y, index_color_factor)]
         # factor
-    scatter = ax.scatter(X[:, 0], X[:, 1], color=colors)
+    ax.scatter(X[:, 0], X[:, 1], color=colors)
     filtered_legend = []
 
     def check_filter(l):
