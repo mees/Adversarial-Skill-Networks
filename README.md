@@ -4,6 +4,8 @@
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/mees/Adversarial-Skill-Networks.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/mees/Adversarial-Skill-Networks/alerts/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
+#### ASN was nominated as finalist for the Best Paper Award in Cognitive Robotics at IEEE International Conference on Robotics and Automation (ICRA) 2020 
+
 This repository is a PyTorch implementation of Adversarial Skill Networks (ASN), an approach for unsupervised skill learning from video. Concretely, our approach learns a task-agnostic skill embedding space from unlabeled multiview videos. We combine a metric learning loss, which utilizes temporal video coherence to learn a state representation, with an entropy regularized adversarial skill-transfer loss. The learned embedding enables training of continuous control policies to solve novel tasks that require the interpolation of previously seen skills. More information at our [project page](http://robotskills.cs.uni-freiburg.de/).
 
 <p align="center">
@@ -11,7 +13,7 @@ This repository is a PyTorch implementation of Adversarial Skill Networks (ASN),
 </p>
 
 ## Reference
-If you find the code helpful please consider citing our work
+If you find the code helpful please consider citing the corresponding [paper](https://arxiv.org/pdf/1910.09430.pdf)
 ```
 @INPROCEEDINGS{mees20icra_asn,
   author = {Oier Mees and Markus Merklinger and Gabriel Kalweit and Wolfram Burgard},
